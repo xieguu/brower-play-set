@@ -1,6 +1,6 @@
 # Browser Play Set
 
-轻量、开源、Windows 优先的多 Profile 浏览器自动化工具。使用本地 Web GUI 管理独立 Chromium 登录环境，通过 **Playwright + 官方 Playwright MCP** 执行通用任务。采用 MIT 许可证。
+轻量、开源、Windows 优先的多 Profile 浏览器自动化工具。使用桌面工作台或本地 Web GUI 管理独立 Electron 登录环境，通过 **Playwright + 官方 Playwright MCP** 执行通用任务。采用 MIT 许可证。
 
 Profile 管理思路参考 [gpt-set](https://github.com/xieguu/gpt-set)。网站地址由用户填写，不绑定 ChatGPT 或任何其他站点。
 
@@ -8,19 +8,20 @@ Profile 管理思路参考 [gpt-set](https://github.com/xieguu/gpt-set)。网站
 
 ## 启动
 
-需要 **Node.js 22 或更新版本**。Windows 10/11 首次双击 `setup.cmd` 安装依赖和 Chromium，以后双击 `start.cmd`。
+需要 **Node.js 22 或更新版本**。Windows 10/11 首次双击 `setup.cmd` 安装依赖（包含 Electron），以后双击 `start.cmd`。
 
 也可以从源码目录运行：
 
 ```powershell
 npm ci
-npm run browsers
 npm start
 ```
 
-GUI：**http://127.0.0.1:8787**。启动时自动打开管理界面；在设置中可关闭此行为。按 `Ctrl+C` 退出，运行中的任务和浏览器会关闭。
+`npm start` 打开 Electron 桌面工作台。关闭工作台会停止任务并关闭实例窗口。也可运行 `npm run start:web`，通过 **http://127.0.0.1:8787** 管理；网页版按 `Ctrl+C` 退出。
 
-无需 Electron、数据库、Docker、云端账号或前端构建。Playwright 与 MCP 固定在兼容版本，并共用一份 Chromium；`npm run browsers` 使用 `--no-shell`，有头和无头模式均运行完整 Chromium。
+两种管理入口创建的 Profile 都使用独立 Electron 进程和原生窗口，网站页面禁用 Node 集成并开启上下文隔离与沙箱。每个 Profile 使用自己的 `data/userdata/<id>/`，网站存储继续放在其 `Default/` 子目录。后台运行时窗口隐藏，点击实时预览可显示并聚焦窗口；兼容保留的 `headless` 字段表示隐藏窗口，不是无显示服务模式。无需数据库、Docker、云端账号或前端构建。
+
+`viewport` 配置指定初始窗口内容尺寸（逻辑像素），超过屏幕工作区时自动收进屏幕内。页面使用原生视口，随窗口拉伸、最大化和系统 DPI 缩放适配，不强制模拟固定分辨率。
 
 ## 使用
 
@@ -105,14 +106,16 @@ GUI：**http://127.0.0.1:8787**。启动时自动打开管理界面；在设置�
 }
 ```
 
-通过官方 `createConnection(config, contextGetter)` 接入已有上下文，使用 MCP SDK 传输和工具协议；没有额外 CDP 端口、MCP 浏览器进程或自行仿造的 MCP 工具。
+通过官方 `createConnection(config, contextGetter)` 接入已有 Electron 上下文，使用 MCP SDK 传输和工具协议。MCP 不另起浏览器；Playwright Electron 启动器管理实例的调试连接。新页面和网站弹窗均创建在同一实例中，共享该实例会话。
 
 ## 数据与架构
 
 ```text
 src/
   store.js             Profile / 设置校验、原子写入、配置文件锁
-  browser.js           独立持久上下文、跨进程 User Data 锁
+  browser.js           Electron 启动、窗口控制、跨进程 User Data 锁
+  profile-window.cjs   每个 Profile 的 Electron 入口、独立会话与代理
+  desktop.cjs          管理工作台的 Electron 入口
   downloads.js         手动与自动下载统一保存
   activity.js          Profile 占用管理
   orchestrator.js      p-queue 全局调度、取消、进度、运行记录
@@ -125,7 +128,7 @@ tasks/                 用户 JSON / JS 插件
 data/
   profiles.json        Profile 配置
   settings.json        全局设置
-  userdata/<id>/       独立 Chromium User Data
+  userdata/<id>/       独立 Electron User Data，Default/ 保存网站数据
   downloads/<id>/      默认下载位置；任务下载位于各自 run-id 子目录
   artifacts/<id>/      每次任务的 run.json、result.json、截图及 MCP 产物
   logs/                按 UTC 日期保存的 JSONL 日志
@@ -146,7 +149,7 @@ node src/cli.js mcp-config --profile PROFILE_ID
 node src/cli.js remove PROFILE_ID --purge
 ```
 
-`run` 中未提供的任务、网址、提示词和无头设置均沿用各 Profile 配置。`--keep-open` 保持浏览器打开；`--fresh` 关闭已有上下文再启动。失败或取消的批次返回非零退出码。
+`run` 中未提供的任务、网址、提示词和窗口显示设置均沿用各 Profile 配置。`--headless` 表示后台运行（隐藏 Electron 窗口），`--keep-open` 保持实例运行；`--fresh` 关闭已有实例再启动。失败或取消的批次返回非零退出码。
 
 | 环境变量 | 默认值 | 用途 |
 | --- | --- | --- |
@@ -163,10 +166,14 @@ node src/cli.js remove PROFILE_ID --purge
 ```powershell
 npm run check             # 所有 JS 文件语法检查
 npm test                  # 配置、模板、任务文件和路径检查
-npm run test:integration  # 真实 Chromium、代理、MCP HTTP、GUI 全流程
+npm run browsers          # 仅 Web GUI 自动化测试需要额外安装 Chromium
+npm run test:integration  # Electron 实例、代理、MCP HTTP、Web GUI 全流程
+npm run test:desktop      # 桌面工作台与 Electron 实例完整流程
 npm run smoke             # 浏览器核心集成检查
 ```
 
 集成测试使用本机测试网页和临时 User Data，不需要第三方账号。覆盖存储与缓存隔离、重启持久化、代理认证、跨进程锁、全局并发、取消、文件上传下载、MCP 与 GUI。GUI 检查截图保存在 `test-results/`。
+
+Linux 上 Electron 需要显示服务；CI 使用 `xvfb-run -a npm run test:integration` 和 `xvfb-run -a npm run test:desktop`。
 
 依赖：[Playwright](https://github.com/microsoft/playwright)、[Playwright MCP](https://github.com/microsoft/playwright-mcp)、[MCP SDK](https://github.com/modelcontextprotocol/typescript-sdk)、Express、p-queue、Zod、proper-lockfile、write-file-atomic、open。依赖许可证保留在各包中；项目许可证见 [LICENSE](LICENSE)。

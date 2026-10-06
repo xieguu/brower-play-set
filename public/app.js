@@ -202,7 +202,7 @@ function tagsHtml(p) {
     statusBadge(p),
     `<span class="badge">${escapeHtml(p.taskId)}</span>`,
     p.proxy?.server ? '<span class="badge">代理</span>' : '',
-    p.headless ? '<span class="badge">无头</span>' : '',
+    p.headless ? '<span class="badge">后台</span>' : '',
   ].join('');
 }
 
@@ -271,7 +271,7 @@ function renderProfiles() {
   }
   if (state.profiles.length && !state.filter && state.statusFilter === 'all') {
     const create = document.createElement('button'); create.className = 'create-tile';
-    create.innerHTML = `${icon('plus')}<span>新建浏览器实例</span><small>一个实例，一个独立工作空间</small>`;
+    create.innerHTML = `${icon('plus')}<span>新建 Electron 实例</span><small>一个实例，一个独立工作空间</small>`;
     create.addEventListener('click', () => openDrawer()); grid.appendChild(create);
   }
   updateSelectedCount();
@@ -655,7 +655,7 @@ async function deleteProfile(id) {
   const p = state.profiles.find((x) => x.id === id);
   if (!p) return;
   state.deletingId = id;
-  $('#deleteDescription').textContent = `删除「${p.name}」的配置。默认保留 Chromium 登录数据。`;
+  $('#deleteDescription').textContent = `删除「${p.name}」的配置。默认保留实例登录数据。`;
   $('#deletePurge').checked = false;
   $('#deleteDialog').showModal();
 }
@@ -1076,11 +1076,11 @@ async function loadMeta() {
       <dt>任务目录</dt><dd>${escapeHtml(meta.tasksDir)}</dd>
       <dt>Playwright</dt><dd>${escapeHtml(meta.playwright)}</dd>
       <dt>Playwright MCP</dt><dd>${escapeHtml(meta.mcp)}</dd>
-      <dt>Chromium</dt><dd>${meta.browser.installed ? '已安装' : '尚未安装'}</dd>
+      <dt>Electron</dt><dd>${meta.browser.installed ? escapeHtml(meta.browser.version) : '尚未安装'}</dd>
     `;
     if (!meta.browser.installed) {
       $('#browserNotice').hidden = false;
-      $('#browserNotice').textContent = '首次使用：运行 setup.cmd，或在项目目录运行 npm run browsers 安装 Chromium。';
+      $('#browserNotice').textContent = '首次使用：运行 setup.cmd，或在项目目录运行 npm ci 安装 Electron 和项目依赖。';
     }
   } catch (error) { toast(error.message, 'error'); }
 }

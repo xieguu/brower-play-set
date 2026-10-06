@@ -1,5 +1,8 @@
 import fs from 'node:fs';
-import { chromium } from 'playwright';
+import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+import { _electron as electron } from 'playwright';
+import PQueue from 'p-queue';
 import lockfile from 'proper-lockfile';
 import { userDataDir, resolveDownloadDir } from './store.js';
 import { scopedLogger, bus } from './logger.js';
@@ -9,10 +12,11 @@ import { trackDownloads } from './downloads.js';
 const sessions = new Map();
 const launches = new Map();
 const closings = new Map();
+const require = createRequire(import.meta.url);
+const profileEntry = fileURLToPath(new URL('./profile-window.cjs', import.meta.url));
 
 function launchOptions(profile, opts) {
   return {
-    channel: 'chromium',
     headless: opts.headless ?? profile.headless,
     viewport: profile.viewport, acceptDownloads: true,
     locale: profile.locale, timezoneId: profile.timezone,
@@ -42,28 +46,58 @@ async function launchFresh(profile, options, signature) {
   const unlock = await acquireDirectory(profile.id);
   let releasePromise;
   const release = () => releasePromise ||= unlock();
+  let application;
   try {
-    logger.info(`启动浏览器（${options.headless ? '无头' : '有头'}模式）`);
-    const context = await chromium.launchPersistentContext(userDataDir(profile.id), options);
+    logger.info(`启动 Electron 实例（${options.headless ? '后台' : '窗口'}模式）`);
+    const { headless, viewport, proxy, userAgent, ...contextOptions } = options;
+    const env = { ...process.env, BPS_ELECTRON_PROFILE: JSON.stringify({
+      name: profile.name, userDataDir: userDataDir(profile.id), headless, viewport, proxy, userAgent,
+    }) };
+    delete env.ELECTRON_RUN_AS_NODE;
+    application = await electron.launch({ args: [profileEntry], env, ...contextOptions,
+      chromiumSandbox: true, timeout: 30000 });
+    const context = application.context();
+    await application.firstWindow({ timeout: 30000 });
+    // Electron pages must be BrowserWindows. Keep the context API used by tasks and MCP.
+    const windows = new PQueue({ concurrency: 1 });
+    context.newPage = () => windows.add(async () => {
+      const [page] = await Promise.all([
+        application.waitForEvent('window', { timeout: 30000 }),
+        application.evaluate(({ app }) => app.emit('bps-new-window')),
+      ]);
+      return page;
+    });
     context.setDefaultTimeout(30000);
     const session = {
-      context, profile, signature, startedAt: Date.now(), closed: false,
+      application, context, profile, signature, startedAt: Date.now(), closed: false,
       downloadDir: resolveDownloadDir(profile), onDownload: null, release,
+      async focus(page = context.pages().at(-1)) {
+        if (!page || page.isClosed()) throw new AppError('实例没有可显示的窗口', 409);
+        const window = await application.browserWindow(page);
+        try {
+          await window.evaluate(window => {
+            if (window.isMinimized()) window.restore();
+            window.show(); window.focus();
+          });
+        } finally { await window.dispose(); }
+        await page.bringToFront();
+      },
     };
     fs.mkdirSync(session.downloadDir, { recursive: true });
     session.downloads = trackDownloads(context, session, logger);
     sessions.set(profile.id, session);
-    context.once('close', () => {
+    application.once('close', () => {
       session.closed = true;
       if (sessions.get(profile.id) === session) sessions.delete(profile.id);
       release().catch(error => logger.error(`释放 Profile 锁失败：${error.message}`));
-      logger.info('浏览器已关闭'); bus.emit('sessions');
+      logger.info('Electron 实例已关闭'); bus.emit('sessions');
     });
     bus.emit('sessions');
     return session;
   } catch (error) {
-    await release();
-    throw new AppError(`浏览器启动失败：${error.message}`, 500, { cause: error });
+    try { if (application) await application.close(); }
+    finally { await release(); }
+    throw new AppError(`Electron 实例启动失败：${error.message}`, 500, { cause: error });
   }
 }
 
@@ -92,7 +126,7 @@ export async function close(profileId) {
   const promise = (async () => {
     const session = launches.has(profileId) ? await launches.get(profileId).promise : sessions.get(profileId);
     if (!session) return false;
-    try { await session.context.close(); }
+    try { await session.application.close(); }
     finally { await session.release(); }
     return true;
   })();
@@ -109,12 +143,13 @@ export async function closeAll() {
 
 export function activeSessions() {
   return [...sessions.values()].map(s => ({
-    profileId: s.profile.id, name: s.profile.name, startedAt: s.startedAt,
+    profileId: s.profile.id, name: s.profile.name, startedAt: s.startedAt, engine: 'electron',
     pages: s.context.pages().length, headless: JSON.parse(s.signature).headless,
   }));
 }
 
 export function browserInfo() {
-  const executablePath = chromium.executablePath();
-  return { installed: fs.existsSync(executablePath), executablePath };
+  const executablePath = require('electron/index.js');
+  return { engine: 'electron', version: require('electron/package.json').version,
+    installed: fs.existsSync(executablePath), executablePath };
 }

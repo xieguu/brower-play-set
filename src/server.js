@@ -113,7 +113,8 @@ export function createApp() {
   }));
   api.post('/profiles/:id/focus', wrap(async (req, res) => {
     if (!profiles.get(req.params.id)) throw new AppError('Profile 不存在', 404);
-    await currentPage(req.params.id).page.bringToFront();
+    const { session, page } = currentPage(req.params.id);
+    await session.focus(page);
     res.json({ ok: true });
   }));
   api.post('/profiles/:id/launch', wrap(async (req, res) => {

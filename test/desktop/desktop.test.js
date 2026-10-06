@@ -38,6 +38,9 @@ test('桌面工作台：独立窗口、真实浏览器预览与退出清理', { 
     await page.locator('.pc-foot [data-act="launch"]').click();
     await page.locator('.pc-preview img:not([hidden])').waitFor();
     assert.equal(await page.locator('.pc-status').innerText(), '运行中');
+    const sessions = await (await fetch(`${origin}/api/sessions`)).json();
+    assert.equal(sessions.length, 1);
+    assert.equal(sessions[0].engine, 'electron');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     fs.mkdirSync('test-results', { recursive: true });
     await until(async () => await page.locator('.toast').count() === 0);

@@ -11,8 +11,6 @@ node -e "if (Number(process.versions.node.split('.')[0]) < 22) { console.error('
 if errorlevel 1 goto failed
 call npm ci
 if errorlevel 1 goto failed
-call npm run browsers
-if errorlevel 1 goto failed
 echo Setup complete. Run start.cmd to open Browser Play Set.
 pause
 exit /b 0
