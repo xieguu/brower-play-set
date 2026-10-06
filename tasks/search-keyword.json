@@ -1,0 +1,15 @@
+{
+  "id": "search-keyword",
+  "name": "搜索关键词（示例）",
+  "description": "打开 Bing，输入提示词作为关键词搜索，读取结果并截图。演示 JSON 任务脚本写法。",
+  "args": ["url", "prompt"],
+  "steps": [
+    { "action": "open", "url": "{{url}}" },
+    { "action": "type", "selector": "textarea[name=q], input[name=q]", "text": "{{prompt}}", "submit": "Enter" },
+    { "action": "wait", "state": "domcontentloaded" },
+    { "action": "wait", "ms": 1200 },
+    { "action": "read", "maxLength": 6000, "saveAs": "results" },
+    { "action": "log", "message": "搜索结果标题：{{last.title}}" },
+    { "action": "screenshot", "name": "{{profile.id}}-search.png", "fullPage": true }
+  ]
+}

@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="auto">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <title>Browser Play Set · 多开浏览器自动化</title>
+  <meta name="description" content="轻量、开源、Windows 优先的多开浏览器自动化工具" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8C%90%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/workspace.css" />
+</head>
+<body>
+  <!-- 顶部栏 -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"/><path d="M3 9h18M3 15h18M12 3c2.5 2.5 2.5 15 0 18M12 3c-2.5 2.5-2.5 15 0 18"/>
+        </svg>
+      </span>
+      <div class="brand-text">
+        <strong>Browser Play Set</strong>
+        <small id="metaLine">多开浏览器自动化</small>
+      </div>
+    </div>
+
+    <div class="topbar-actions">
+      <span class="status-dot" id="connDot" title="连接状态"></span>
+      <span id="connectionLabel">连接中</span><span class="top-divider"></span>
+      <button class="top-link" data-go="settings"><i data-lucide="settings-2"></i>设置</button>
+      <button class="top-link" id="helpBtn"><i data-lucide="circle-help"></i>帮助</button>
+      <button class="icon-btn" id="themeToggle" title="切换主题" aria-label="切换主题">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+  <aside class="sidebar">
+    <div class="workspace-label">WORKSPACE <span>本地</span></div>
+    <nav class="tabs" role="tablist" aria-label="主导航" aria-orientation="vertical">
+      <button class="tab is-active" role="tab" data-view="profiles" aria-selected="true"><i data-lucide="panels-top-left"></i><span>实例管理</span><span class="nav-count" id="navProfileCount">0</span></button>
+      <button class="tab" role="tab" data-view="run" aria-selected="false"><i data-lucide="workflow"></i><span>运行控制台</span></button>
+      <button class="tab" role="tab" data-view="tasks" aria-selected="false"><i data-lucide="file-code-2"></i><span>任务脚本</span></button>
+      <button class="tab" role="tab" data-view="proxies" aria-selected="false"><i data-lucide="network"></i><span>代理管理</span></button>
+      <div class="nav-divider"></div>
+      <button class="tab" role="tab" data-view="logs" aria-selected="false"><i data-lucide="scroll-text"></i><span>日志中心</span></button>
+      <button class="tab" role="tab" data-view="settings" aria-selected="false"><i data-lucide="sliders-horizontal"></i><span>环境设置</span></button>
+    </nav>
+    <div class="sidebar-bottom"><div class="local-mark"><i data-lucide="hard-drive"></i><div><strong>本地工作空间</strong><span>独立会话 · 持久保存</span></div><span class="dot green"></span></div><p>让每一个浏览器，各司其职。</p></div>
+  </aside>
+  <main class="app">
+    <!-- ============ Profile 视图 ============ -->
+    <section class="view is-active" id="view-profiles">
+      <div class="workspace-heading"><div><div class="eyebrow">BROWSER WORKSPACE</div><h1>浏览器实例 <span>统一管理，独立运行。</span></h1></div><div class="live-label"><span class="dot green"></span>本地工作台</div></div>
+      <div class="command-bar">
+        <button class="btn primary" id="addProfileBtn"><i data-lucide="plus"></i>新建实例</button>
+        <button class="btn positive" id="batchLaunchBtn" disabled><i data-lucide="play"></i>批量启动</button>
+        <button class="btn stop" id="batchStopBtn" disabled><i data-lucide="square"></i>批量停止</button>
+        <span class="command-divider"></span>
+        <button class="btn" id="batchRunBtn" disabled><i data-lucide="circle-play"></i>执行任务</button>
+        <button class="btn" data-go="tasks"><i data-lucide="file-code-2"></i>任务脚本</button>
+        <button class="btn" data-go="proxies"><i data-lucide="network"></i>代理管理</button>
+        <span class="spacer"></span><button class="icon-btn" id="refreshProfilesBtn" title="刷新实例" aria-label="刷新实例"><i data-lucide="refresh-cw"></i></button>
+      </div>
+      <div class="dashboard-layout"><div class="dashboard-main">
+        <div class="instance-filters"><div class="status-filters" role="group" aria-label="实例状态筛选"><button class="is-active" data-status-filter="all">全部 <span id="filterAllCount">0</span></button><button data-status-filter="open">运行中 <span id="filterOpenCount">0</span></button><button data-status-filter="idle">已停止 <span id="filterIdleCount">0</span></button><button data-status-filter="error">异常 <span id="filterErrorCount">0</span></button></div><div class="search-wrap"><i data-lucide="search"></i><input class="input search" id="profileSearch" type="search" placeholder="搜索实例或网址" aria-label="搜索 Profile" /></div></div>
+        <div class="selection-bar"><label class="check"><input type="checkbox" id="selectAll" />全选当前结果</label><span id="selectedCount">已选 0 个</span><span class="spacer"></span><label class="check preview-toggle"><input type="checkbox" id="previewEnabled" checked />实时预览</label><span class="layout-switch"><button class="icon-btn is-active" data-layout="grid" aria-label="网格视图"><i data-lucide="layout-grid"></i></button><button class="icon-btn" data-layout="list" aria-label="列表视图"><i data-lucide="list"></i></button></span></div>
+        <div class="notice" id="browserNotice" hidden></div><div class="grid" id="profileGrid"></div>
+        <div class="empty welcome-empty" id="profileEmpty" hidden><div class="empty-icon"><i data-lucide="panels-top-left"></i></div><h2>从第一个浏览器实例开始</h2><p>独立的登录状态、专属代理，以及你自己的自动化任务。</p><button class="btn primary" id="emptyAddBtn"><i data-lucide="plus"></i>创建第一个实例</button><div class="empty-steps"><span>01 创建实例</span><i data-lucide="chevron-right"></i><span>02 登录网站</span><i data-lucide="chevron-right"></i><span>03 运行任务</span></div></div>
+        <div class="empty small" id="noMatches" hidden><i data-lucide="search-x"></i><p>没有符合筛选条件的实例</p><button class="btn ghost" id="resetFiltersBtn">清除筛选</button></div>
+        <section class="log-dock card"><div class="dock-head"><h2><i data-lucide="terminal"></i>运行日志<span class="muted" id="dockLogCount">0 条</span></h2><span class="spacer"></span><select class="input compact" id="dockLogLevel" aria-label="首页日志级别"><option value="info">全部日志</option><option value="warn">警告与错误</option><option value="error">仅错误</option></select><label class="check"><input type="checkbox" id="dockLogFollow" checked />自动滚动</label><button class="icon-btn" data-go="logs" aria-label="打开日志中心"><i data-lucide="maximize-2"></i></button></div><div id="dockLogBox" class="dock-logbox" role="log" aria-label="最近运行日志"></div></section>
+      </div><aside class="dashboard-rail" aria-label="工作台监控">
+        <section class="rail-card"><div class="rail-head"><h2>系统资源</h2><span class="live-label" id="metricsStatus"><span class="dot green"></span>实时</span></div><div class="metric"><div class="metric-label">CPU 使用率<span id="cpuValue">—</span></div><svg class="sparkline blue" viewBox="0 0 240 44" preserveAspectRatio="none" aria-label="CPU 使用率趋势"><path id="cpuArea" class="chart-area"/><path id="cpuLine" class="chart-line"/></svg></div><div class="metric"><div class="metric-label">内存使用<span id="memoryValue">—</span></div><svg class="sparkline green" viewBox="0 0 240 44" preserveAspectRatio="none" aria-label="内存使用趋势"><path id="memoryArea" class="chart-area"/><path id="memoryLine" class="chart-line"/></svg></div><div class="process-metric"><span>服务内存</span><strong id="processMemory">—</strong></div><div class="process-metric"><span>服务运行时间</span><strong id="serviceUptime">—</strong></div></section>
+        <section class="rail-card"><div class="rail-head"><h2>实例概览</h2><i data-lucide="chart-no-axes-column-increasing"></i></div><div id="profileStats" aria-live="polite"></div></section>
+        <section class="rail-card"><div class="rail-head"><h2>任务动态</h2><button class="text-link" data-go="run">查看全部<i data-lucide="arrow-up-right"></i></button></div><div id="dashboardQueue" class="queue-list"></div></section>
+        <section class="rail-card quick-card"><div class="rail-head"><h2>快捷操作</h2></div><div class="quick-grid"><button id="quickAddBtn"><i data-lucide="square-plus"></i>新建实例</button><button id="quickTaskBtn"><i data-lucide="file-plus-2"></i>新建任务</button><button id="importProfilesBtn"><i data-lucide="upload"></i>导入配置</button><button id="exportProfilesBtn"><i data-lucide="download"></i>导出配置</button></div><input id="importProfilesFile" type="file" accept=".json,application/json" hidden /></section>
+      </aside></div>
+      <footer class="workspace-footer"><span><span class="dot green"></span>数据保存在本机</span><span>Playwright + MCP<span class="footer-divider">/</span>Browser Play Set</span></footer>
+    </section>
+
+    <!-- ============ 运行视图 ============ -->
+    <section class="view" id="view-run">
+      <div class="view-head">
+        <div>
+          <h1>运行控制台</h1>
+          <p class="muted">选择 Profile 与任务，设定并发数后一键启动。</p>
+        </div>
+      </div>
+
+      <div class="run-layout">
+        <div class="card panel">
+          <h2>运行配置</h2>
+          <div class="field">
+            <label>选择 Profile</label>
+            <div class="chips" id="runProfileChips"></div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="runTask">任务</label>
+              <select class="input" id="runTask"></select>
+            </div>
+            <div class="field">
+              <label for="runConcurrency">并发数</label>
+              <input class="input" id="runConcurrency" type="number" min="1" max="20" value="3" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="runUrl">本次网站 URL（可选）</label>
+            <input class="input" id="runUrl" placeholder="留空使用各 Profile 的网址" />
+          </div>
+          <div class="field">
+            <label for="runPrompt">提示词 / 参数</label>
+            <textarea class="input" id="runPrompt" rows="3" placeholder="留空使用各 Profile 的提示词；由任务步骤决定如何使用"></textarea>
+          </div>
+          <details class="advanced">
+            <summary>任务变量（JSON）</summary>
+            <div class="field"><label for="runVars">传入脚本的变量</label><textarea class="input code-input" id="runVars" rows="3" placeholder='{"selector":"input[name=q]","resultSelector":"#results"}'></textarea></div>
+          </details>
+          <div class="field">
+            <label for="runHeadless">浏览器显示</label>
+            <select class="input" id="runHeadless"><option value="">按各 Profile 设置</option><option value="false">显示浏览器窗口</option><option value="true">无头模式</option></select>
+          </div>
+          <div class="field-row">
+            <label class="check"><input type="checkbox" id="runReuse" checked /> 复用已开浏览器</label>
+            <label class="check"><input type="checkbox" id="runKeepOpen" /> 结束后保持打开</label>
+          </div>
+          <button class="btn primary block" id="runBtn">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            开始运行
+          </button>
+        </div>
+
+        <div class="card panel">
+          <h2>实时状态 <span class="muted" id="runSummary"></span></h2>
+          <div class="runs" id="runList"></div>
+          <div class="empty small" id="runEmpty"><p>暂无运行记录，启动一次任务即可在此查看进度。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 任务视图 ============ -->
+    <section class="view" id="view-tasks">
+      <div class="view-head">
+        <div>
+          <h1>任务脚本</h1>
+          <p class="muted">通用自动化引擎 + 可插拔任务脚本。把 JSON 文件放入 <code>tasks/</code> 目录即可自动加载。</p>
+        </div>
+        <div class="head-actions">
+          <button class="btn ghost" id="reloadTasksBtn">重新加载</button>
+          <button class="btn ghost" id="importTaskBtn">导入 JSON</button>
+          <button class="btn primary" id="newTaskBtn">新建任务</button>
+          <input id="importTaskFile" type="file" accept=".json,application/json" hidden />
+        </div>
+      </div>
+      <p class="notice error" id="taskLoadError" hidden></p>
+      <div class="grid" id="taskGrid"></div>
+    </section>
+
+    <!-- ============ 日志视图 ============ -->
+    <section class="view" id="view-logs">
+      <div class="view-head">
+        <div>
+          <h1>运行日志</h1>
+          <p class="muted">实时推送，同时按天写入 <code>data/logs/</code>。</p>
+        </div>
+        <div class="head-actions">
+          <input class="input search" id="logFilter" type="search" placeholder="过滤关键字…" aria-label="过滤日志" />
+          <select class="input compact" id="logProfile" aria-label="按 Profile 过滤日志"><option value="">全部 Profile</option></select>
+          <select class="input compact" id="logLevel">
+            <option value="debug">全部级别</option>
+            <option value="info" selected>Info 及以上</option>
+            <option value="warn">Warn 及以上</option>
+            <option value="error">仅 Error</option>
+          </select>
+          <label class="check"><input type="checkbox" id="logFollow" checked /> 自动滚动</label>
+          <button class="btn ghost" id="clearLogsBtn">清空</button>
+        </div>
+      </div>
+      <div class="logbox" id="logBox" role="log" aria-live="polite"></div>
+    </section>
+
+    <section class="view" id="view-proxies"><div class="view-head"><div><div class="eyebrow">NETWORK</div><h1>代理管理</h1><p class="muted">检查每个实例的连接方式，编辑独立的代理服务器与认证信息。</p></div></div><div class="notice">未配置独立代理的实例使用当前运行账号的系统网络设置。更换代理前，请先关闭对应浏览器。</div><div class="card proxy-table-wrap"><table class="proxy-table"><thead><tr><th>浏览器实例</th><th>连接方式</th><th>代理服务器</th><th>认证</th><th>状态</th><th>操作</th></tr></thead><tbody id="proxyTableBody"></tbody></table></div></section>
+    <!-- ============ 设置视图 ============ -->
+    <section class="view" id="view-settings">
+      <div class="view-head"><div><h1>设置</h1><p class="muted">全局默认值与运行环境信息。</p></div></div>
+      <div class="settings-layout">
+        <div class="card panel">
+          <h2>全局默认</h2>
+          <div class="field">
+            <label for="setConcurrency">默认并发数</label>
+            <input class="input" id="setConcurrency" type="number" min="1" max="20" />
+          </div>
+          <div class="field">
+            <label for="setDownloadDir">默认下载目录</label>
+            <input class="input" id="setDownloadDir" type="text" />
+          </div>
+          <div class="field">
+            <label for="setLogRetention">内存日志保留条数</label>
+            <input class="input" id="setLogRetention" type="number" min="100" max="20000" step="100" />
+          </div>
+          <label class="check"><input type="checkbox" id="setHeadless" /> 默认无头模式</label>
+          <label class="check"><input type="checkbox" id="setAutoOpen" /> 启动时打开管理界面</label>
+          <button class="btn primary" id="saveSettingsBtn">保存设置</button>
+        </div>
+        <div class="card panel">
+          <h2>环境信息</h2>
+          <dl class="kv" id="envInfo"></dl>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Profile 编辑抽屉 -->
+  <div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
+  <aside class="drawer" id="drawer" hidden role="dialog" aria-modal="true" aria-label="编辑 Profile">
+    <header class="drawer-head">
+      <h2 id="drawerTitle">新建 Profile</h2>
+      <button class="icon-btn" id="drawerClose" aria-label="关闭">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </header>
+    <form class="drawer-body" id="profileForm">
+      <input type="hidden" id="pfId" />
+      <div class="field">
+        <label for="pfName">名称 <span class="req">*</span></label>
+        <input class="input" id="pfName" required maxlength="60" placeholder="例如：账号 A" />
+      </div>
+      <div class="field">
+        <label for="pfUrl">网站 URL</label>
+        <input class="input" id="pfUrl" type="text" placeholder="https://example.com" />
+        <small class="hint">任意网址，不限制站点。</small>
+      </div>
+      <div class="field">
+        <label for="pfTask">任务</label>
+        <select class="input" id="pfTask"></select>
+      </div>
+      <div class="field">
+        <label for="pfPrompt">提示词 / 参数</label>
+        <textarea class="input" id="pfPrompt" rows="3" placeholder="任务运行时可通过 {{prompt}} 引用"></textarea>
+      </div>
+
+      <details class="advanced" open>
+        <summary>代理与高级选项</summary>
+        <div class="field-row">
+          <div class="field">
+            <label for="pfProxy">代理服务器</label>
+            <input class="input" id="pfProxy" placeholder="http://host:port 或 socks5://host:port" />
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label for="pfProxyUser">代理用户名</label><input class="input" id="pfProxyUser" /></div>
+          <div class="field"><label for="pfProxyPass">代理密码</label><input class="input" id="pfProxyPass" type="password" /></div>
+        </div>
+        <div class="field"><label for="pfProxyBypass">代理绕过列表（可选）</label><input class="input" id="pfProxyBypass" placeholder="localhost,127.0.0.1" /></div>
+        <div class="field-row">
+          <div class="field">
+            <label for="pfLocale">语言</label>
+            <select class="input" id="pfLocale">
+              <option value="ja-JP">日语（日本）</option>
+              <option value="zh-CN" selected>简体中文（中国）</option>
+              <option value="ko-KR">韩语（韩国）</option>
+              <option value="en-US">英语（美国）</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="pfTimezone">时区</label>
+            <select class="input" id="pfTimezone">
+              <option value="Asia/Tokyo">日本 · 东京</option>
+              <option value="Asia/Shanghai" selected>中国 · 北京时间</option>
+              <option value="Asia/Seoul">韩国 · 首尔</option>
+              <optgroup label="美国">
+                <option value="America/New_York">美国东部 · 纽约</option>
+                <option value="America/Chicago">美国中部 · 芝加哥</option>
+                <option value="America/Denver">美国山地 · 丹佛</option>
+                <option value="America/Los_Angeles">美国西部 · 洛杉矶</option>
+              </optgroup>
+            </select>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label for="pfWidth">视口宽</label><input class="input" id="pfWidth" type="number" min="320" max="3840" /></div>
+          <div class="field"><label for="pfHeight">视口高</label><input class="input" id="pfHeight" type="number" min="240" max="2160" /></div>
+        </div>
+        <div class="field">
+          <label for="pfDownloadDir">下载目录（留空用全局默认）</label>
+          <input class="input" id="pfDownloadDir" placeholder="C:\\Users\\...\\Downloads" />
+        </div>
+        <div class="field">
+          <label for="pfUserAgent">User-Agent（可选）</label>
+          <input class="input" id="pfUserAgent" placeholder="留空使用默认" />
+        </div>
+        <label class="check"><input type="checkbox" id="pfHeadless" /> 无头模式</label>
+      </details>
+      <p class="hint storage-hint" id="pfStorageInfo"></p>
+    </form>
+    <footer class="drawer-foot">
+      <button class="btn ghost" id="drawerCancel">取消</button>
+      <button class="btn primary" id="drawerSave">保存</button>
+    </footer>
+  </aside>
+
+  <dialog class="modal wide" id="taskEditor" aria-labelledby="taskEditorTitle">
+    <form id="taskEditorForm">
+      <header class="modal-head"><h2 id="taskEditorTitle">JSON 任务编辑器</h2><button type="button" class="icon-btn" data-close-dialog="taskEditor" aria-label="关闭任务编辑器">×</button></header>
+      <p class="muted">用步骤描述网站操作。可以引用 {{url}}、{{prompt}} 和 {{vars.变量名}}。</p>
+      <label class="sr-only" for="taskJson">任务 JSON</label>
+      <textarea id="taskJson" class="input code-input" rows="18" spellcheck="false" required></textarea>
+      <p id="taskEditorError" class="error-text" role="alert"></p>
+      <footer class="modal-foot"><span class="hint">保存后立即可选，无需重启。</span><button class="btn primary" id="saveTaskBtn" type="submit">校验并保存</button></footer>
+    </form>
+  </dialog>
+  <dialog class="modal" id="mcpDialog" aria-labelledby="mcpTitle">
+    <header class="modal-head"><h2 id="mcpTitle">连接 Playwright MCP</h2><button class="icon-btn" data-close-dialog="mcpDialog" aria-label="关闭 MCP 配置">×</button></header>
+    <p class="muted">将配置加入支持 Streamable HTTP 的 MCP 客户端。连接期间，该 Profile 由客户端独占；断开后可继续运行任务。</p>
+    <label class="sr-only" for="mcpConfig">MCP 客户端配置</label><textarea id="mcpConfig" class="input code-input" rows="10" readonly></textarea>
+    <footer class="modal-foot"><button class="btn ghost" id="disconnectMcpBtn">断开此 Profile 的 MCP</button><button class="btn primary" id="copyMcpBtn">复制配置</button></footer>
+  </dialog>
+  <dialog class="modal wide" id="runDetail" aria-labelledby="runDetailTitle">
+    <header class="modal-head"><h2 id="runDetailTitle">运行详情</h2><button class="icon-btn" data-close-dialog="runDetail" aria-label="关闭运行详情">×</button></header>
+    <div id="runDetailBody"></div>
+  </dialog>
+  <dialog class="modal" id="deleteDialog" aria-labelledby="deleteTitle">
+    <header class="modal-head"><h2 id="deleteTitle">删除 Profile</h2></header><p id="deleteDescription"></p>
+    <label class="check"><input type="checkbox" id="deletePurge" /> 同时清除该 Profile 的登录数据（不可恢复）</label>
+    <footer class="modal-foot"><button class="btn ghost" data-close-dialog="deleteDialog">取消</button><button class="btn danger" id="confirmDeleteBtn">删除</button></footer>
+  </dialog>
+
+  <dialog class="modal" id="helpDialog" aria-labelledby="helpTitle"><header class="modal-head"><h2 id="helpTitle">开始使用工作台</h2><button class="icon-btn" data-close-dialog="helpDialog" aria-label="关闭帮助">×</button></header><ol class="help-steps"><li><strong>创建浏览器实例</strong><p>为实例命名，填写网站地址；需要代理时在高级选项中设置。</p></li><li><strong>打开并登录网站</strong><p>登录状态会保存在该实例中，下次打开继续使用。</p></li><li><strong>选择实例，执行任务</strong><p>可以用内置任务，也可以在任务脚本中编写自己的 JSON 步骤。</p></li><li><strong>查看实时预览与结果</strong><p>首页每隔数秒刷新预览。点击运行中的预览可切换到浏览器；任务产物在运行控制台查看。</p></li></ol><p class="hint">MCP 连接入口位于实例卡片的更多菜单中。</p></dialog>
+  <!-- 全局提示 -->
+  <div class="toasts" id="toasts"></div>
+
+  <dialog class="modal" id="importProfilesDialog" aria-labelledby="importProfilesTitle">
+    <header class="modal-head"><h2 id="importProfilesTitle">导入浏览器实例</h2><button class="icon-btn" data-close-dialog="importProfilesDialog" aria-label="关闭配置导入">×</button></header>
+    <p id="importProfilesSummary" class="muted"></p>
+    <ul id="importProfilesList" class="import-preview"></ul>
+    <p class="hint">每条配置会创建一个新的独立实例，登录状态从空白开始。已有实例保持原样。</p>
+    <p id="importProfilesError" class="form-error" role="alert"></p>
+    <div class="modal-actions"><button class="btn ghost" data-close-dialog="importProfilesDialog">取消</button><button class="btn primary" id="confirmImportProfilesBtn">确认导入</button></div>
+  </dialog>
+  <script src="/vendor/lucide.js"></script>
+  <script src="/app.js" type="module"></script>
+</body>
+</html>

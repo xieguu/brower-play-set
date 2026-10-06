@@ -1,0 +1,48 @@
+{
+  "name": "browser-play-set",
+  "version": "1.0.0",
+  "private": true,
+  "description": "轻量、开源、Windows 优先的多开浏览器自动化工具：Profile 级隔离 + 通用自动化引擎 + 可插拔任务脚本。",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "bps": "src/cli.js"
+  },
+  "main": "src/desktop.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dev": "node --watch src/server.js",
+    "cli": "node src/cli.js",
+    "browsers": "playwright install --no-shell chromium",
+    "test": "node --test test/*.test.js",
+    "test:integration": "node --test --test-concurrency=1 test/integration/*.test.js",
+    "check": "node scripts/check.js",
+    "smoke": "node scripts/smoke.js",
+    "start:web": "node src/server.js",
+    "test:desktop": "node --test test/desktop/*.test.js"
+  },
+  "keywords": [
+    "playwright",
+    "browser-automation",
+    "multi-profile",
+    "chromium",
+    "mcp",
+    "windows"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.0",
+    "@playwright/mcp": "0.0.83",
+    "electron": "44.5.1",
+    "express": "^4.19.2",
+    "lucide": "0.468.0",
+    "open": "11.0.4",
+    "p-queue": "^8.1.1",
+    "playwright": "1.64.0-alpha-1790635538000",
+    "proper-lockfile": "4.1.2",
+    "write-file-atomic": "6.0.0",
+    "zod": "^4.6.5"
+  }
+}
