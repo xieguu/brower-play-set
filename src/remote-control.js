@@ -1,4 +1,7 @@
 import net from 'node:net';
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { WebSocketServer, createWebSocketStream } from 'ws';
 import { z } from 'zod';
@@ -7,6 +10,7 @@ import { reserve } from './activity.js';
 import { AppError, parse } from './errors.js';
 import { stopChild } from './virtual-display.js';
 import { logger } from './logger.js';
+import { LOG_DIR } from './config.js';
 
 const viewers = new Map();
 const commandSchema = z.discriminatedUnion('action', [
@@ -56,6 +60,8 @@ async function connectVnc(display) {
   let child, peer, client;
   const listener = net.createServer({ pauseOnConnect: true });
   let errorText = '';
+  fs.mkdirSync(LOG_DIR, { recursive: true });
+  const logFile = path.join(LOG_DIR, `vnc-${crypto.randomUUID()}.log`);
   await new Promise((resolve, reject) => {
     listener.once('error', reject); listener.listen(0, '127.0.0.1', resolve);
   });
@@ -64,7 +70,7 @@ async function connectVnc(display) {
       listener.once('connection', socket => {
         peer = socket;
         peer.on('error', () => {});
-        child = spawn('x11vnc', ['-inetd', '-q', '-o', '/dev/stderr', '-display', display, '-nopw', '-noshm', '-noxdamage', '-xkb', '-repeat'],
+        child = spawn('x11vnc', ['-inetd', '-q', '-o', logFile, '-display', display, '-nopw', '-noshm', '-noxdamage', '-xkb', '-repeat'],
           { stdio: [socket, socket, 'pipe'] });
         child.stderr.on('data', chunk => { errorText = (errorText + chunk).slice(-2000); });
         child.once('error', reject); child.once('spawn', resolve);
@@ -73,10 +79,14 @@ async function connectVnc(display) {
       client.once('error', reject);
     });
     await accepted;
-    return { child, socket: client, diagnostic: () => errorText,
-      async close() { client.destroy(); peer.destroy(); await stopChild(child); } };
+    return { child, socket: client,
+      diagnostic: () => errorText + (fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8').slice(-2000) : ''),
+      async close() {
+        client.destroy(); peer.destroy(); await stopChild(child); fs.rmSync(logFile, { force: true });
+      } };
   } catch (error) {
     client?.destroy(); peer?.destroy(); if (child?.pid) await stopChild(child);
+    fs.rmSync(logFile, { force: true });
     throw error;
   } finally { listener.close(); }
 }
