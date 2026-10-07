@@ -10,8 +10,6 @@ Profile 管理思路参考 [gpt-set](https://github.com/xieguu/gpt-set)。网站
 
 在已安装 **Node.js 22+、npm、Git** 的 Ubuntu 22.04/24.04 上运行：
 
-也可以从源码目录运行：
-
 ```bash
 git clone -b ubt --single-branch https://github.com/xieguu/brower-play-set.git
 cd brower-play-set
@@ -34,6 +32,76 @@ echo $! >data/server.pid
 所有实例强制使用无头模式，兼容导入的 `headless` 字段不改变服务器运行模式。每个 Profile 使用自己的 `data/userdata/<id>/`；`viewport` 控制页面渲染及截图大小。网页提供预览截图，网站交互通过任务或 MCP 完成。备份 `data/`、`tasks/` 和 `.env` 即可保留配置、登录状态和任务；Electron User Data 不自动迁移。
 
 `bash start.sh` 加载 `.env`。开发时直接 `npm start` 使用当前进程环境变量，默认仅监听 `127.0.0.1:8787`。
+
+## 云服务器完整部署（Windows 通过 SSH 访问）
+
+以下步骤适用于 Ubuntu 云服务器。第 1–4 步在已经通过 SSH 登录的服务器 `root@...:~#` 终端中执行；第 5 步在 Windows 新开的 CMD 窗口中执行。此方式让服务监听服务器本机，通过 SSH 转发访问，不需要对外放行 TCP 8787。
+
+### 1. 安装 Node.js 22 和 Git
+
+```bash
+apt-get update
+apt-get install -y ca-certificates curl git
+curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh
+bash /tmp/nodesource_setup.sh
+apt-get install -y nodejs
+node -v
+```
+
+### 2. 下载 ubt 分支并安装依赖
+
+```bash
+cd /opt
+git clone -b ubt --single-branch https://github.com/xieguu/brower-play-set.git
+cd brower-play-set
+bash setup.sh
+```
+
+### 3. 设置管理账号密码
+
+复制整段执行，按提示输入非空的字母和数字组合密码。此步骤写入 `.env`，设置用户名为 `admin`，监听地址为 `127.0.0.1:8787`。
+
+```bash
+read -rsp '设置管理密码: ' BPS_PASSWORD
+echo
+if [[ "$BPS_PASSWORD" =~ ^[A-Za-z0-9]+$ ]]; then
+  (umask 077; printf 'HOST=127.0.0.1\nPORT=8787\nBPS_ADMIN_USER=admin\nBPS_ADMIN_PASSWORD="%s"\n' "$BPS_PASSWORD" > .env)
+  chmod 600 .env
+else
+  echo '密码必须为非空的字母和数字组合，请重新执行本步骤。'
+fi
+unset BPS_PASSWORD
+```
+
+### 4. 后台启动
+
+```bash
+mkdir -p data
+nohup bash start.sh >data/server.log 2>&1 &
+echo $! >data/server.pid
+sleep 2
+cat data/server.log
+```
+
+日志出现 `http://127.0.0.1:8787` 且没有启动错误后，即可连接。退出 SSH 后程序仍会运行；此启动方式不配置服务器重启后的自动启动。查看日志和停止服务：
+
+```bash
+cd /opt/brower-play-set
+tail -n 100 data/server.log
+kill "$(cat data/server.pid)"
+```
+
+### 5. Windows 上打开管理页面
+
+在 Windows **另开一个 CMD 窗口**，将 `SERVER_IP` 替换为云服务器公网 IP，然后执行：
+
+```cmd
+ssh -N -L 8787:127.0.0.1:8787 -o ExitOnForwardFailure=yes -o ServerAliveInterval=60 root@SERVER_IP
+```
+
+保持这个窗口打开，本机浏览器访问 **http://127.0.0.1:8787**。用户名为 `admin`，密码为第 3 步设置的密码。SSH 断开后重新执行该转发命令即可恢复访问。
+
+进入「环境设置」，先把任务并发数设为 **1** 并保存，再创建实例运行任务。`ssh -D 1080` 提供 SOCKS 代理；这里的 `-L 8787:127.0.0.1:8787` 才是管理页面的端口转发。
 
 ## 使用
 
