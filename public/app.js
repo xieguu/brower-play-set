@@ -409,7 +409,7 @@ async function updatePreview(card) {
     const current = $(`.profile-card[data-id="${id}"]`);
     if (!current) return;
     const img = $('.pc-preview img', current); img.src = url; img.hidden = false;
-    $('.preview-placeholder', current).hidden = true; $('.preview-hint', current).hidden = false; $('.preview-hint', current).textContent = '实时预览 · 点击进入';
+    $('.preview-placeholder', current).hidden = true; $('.preview-hint', current).hidden = false; $('.preview-hint', current).textContent = '实时预览 · 点击操作';
   } catch (error) {
     const old = state.previews.get(id);
     if (old?.url) URL.revokeObjectURL(old.url);

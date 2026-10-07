@@ -18,7 +18,12 @@ test('Ubuntu remote browser: real noVNC input, scaling, Chinese, isolation and c
     const headers = { Authorization: `Basic ${Buffer.from(`${credentials.username}:${credentials.password}`).toString('base64')}` };
     const runtime = await startServer({ port: 0, ...credentials });
     const client = await chromium.launch({ channel: 'chromium', headless: true });
+    let page;
     t.after(async () => {
+      if (page && !page.isClosed()) {
+        fs.mkdirSync('test-results', { recursive: true });
+        await page.screenshot({ path: 'test-results/remote-final.png' });
+      }
       await client.close(); await runtime.stop(); await site.close(); temp.remove();
     });
     const a = profiles.add({ name: 'Remote A', url: site.url, viewport: { width: 1000, height: 700 } });
@@ -29,10 +34,19 @@ test('Ubuntu remote browser: real noVNC input, scaling, Chinese, isolation and c
     await target.goto(site.url); await sb.context.pages()[0].goto(site.url);
     await target.bringToFront();
     const context = await client.newContext({ httpCredentials: credentials, viewport: { width: 1100, height: 850 } });
-    const page = await context.newPage();
+    page = await context.newPage();
     const errors = []; page.on('pageerror', error => errors.push(error.message));
+    const signals = [];
+    page.on('console', message => { if (message.type() === 'error') signals.push(message.text().replace(/token=[a-f0-9]+/g, 'token=<REDACTED>')); });
+    page.on('websocket', ws => ws.on('socketerror', error => signals.push(String(error).replace(/token=[a-f0-9]+/g, 'token=<REDACTED>'))));
     await page.goto(`${runtime.origin}/control.html?profile=${a.id}`);
-    await page.locator('#status[data-state=connected]').waitFor({ timeout: 20000 });
+    try { await page.locator('#status[data-state=connected]').waitFor({ timeout: 20000 }); }
+    catch (error) {
+      const { recentLogs } = await import('../../src/logger.js');
+      throw new Error(JSON.stringify({ state: await page.locator('#status').textContent(),
+        error: await page.locator('#error').textContent(), errors, signals,
+        server: recentLogs().filter(entry => entry.level === 'error').map(entry => entry.message) }), { cause: error });
+    }
     assert.equal(activity(a.id).kind, 'remote');
     assert.throws(() => reserve(a.id, { kind: 'task' }), /占用/);
     const canvas = page.locator('#screen canvas');

@@ -19,6 +19,22 @@ const errors = [];
 let exportedProfiles;
 page.on('pageerror', error => errors.push(error.message));
 const screenshots = path.resolve('test-results'); fs.mkdirSync(screenshots, { recursive: true });
+
+test('remote control page loads noVNC modules and reports unavailable instances', async () => {
+  const control = await context.newPage();
+  try {
+    await control.goto(`${runtime.origin}/control.html?profile=aaaaaaaaaaaa`);
+    assert.equal(await control.evaluate(async () => typeof (await import('/vendor/novnc/core/rfb.js')).default), 'function');
+    await control.locator('#error:not([hidden])').waitFor();
+    assert.match(await control.locator('#error').textContent(), /实例尚未启动/);
+    const upgraded = new Promise(resolve => runtime.server.once('upgrade', req => resolve(runtime.app.locals.access.check(req))));
+    await control.evaluate(() => new Promise(resolve => {
+      const ws = new WebSocket(`${location.origin.replace('http:', 'ws:')}/nonexistent-socket`);
+      ws.onerror = () => resolve();
+    }));
+    assert.equal(await upgraded, 0, 'browser WebSocket reuses the authenticated session');
+  } finally { await control.close(); }
+});
 after(async () => { await browser.close(); await runtime.stop(); await site.close(); temp.remove(); });
 
 test('GUI：创建 JSON 任务、配置两个独立 Profile、并发运行、进度、产物和 MCP 配置', { timeout: 90000 }, async () => {
