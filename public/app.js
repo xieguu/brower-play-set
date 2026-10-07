@@ -1075,7 +1075,7 @@ async function loadMeta() {
       <dt>任务目录</dt><dd>${escapeHtml(meta.tasksDir)}</dd>
       <dt>Playwright</dt><dd>${escapeHtml(meta.playwright)}</dd>
       <dt>Playwright MCP</dt><dd>${escapeHtml(meta.mcp)}</dd>
-      <dt>Chromium</dt><dd>${meta.browser.installed ? '后台运行' : '尚未安装'}</dd>
+      <dt>Chromium</dt><dd>${meta.browser.installed ? (meta.browser.remoteControl ? '支持远程操作' : '无头自动化') : '尚未安装'}</dd>
     `;
     if (!meta.browser.installed) {
       $('#browserNotice').hidden = false;
