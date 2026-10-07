@@ -16,5 +16,5 @@ export const HOST = process.env.HOST || '127.0.0.1';
 export const PORT = Number(process.env.PORT || 8787);
 export const VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
 
-if (!['127.0.0.1', 'localhost', '::1'].includes(HOST)) throw new Error('HOST 必须是本机回环地址');
+if (!HOST.trim() || /[\s/]/.test(HOST)) throw new Error('HOST 必须是有效监听地址');
 if (!Number.isInteger(PORT) || PORT < 0 || PORT > 65535) throw new Error('PORT 必须是 0–65535 的整数');

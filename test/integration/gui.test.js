@@ -8,9 +8,11 @@ import { workspace, fixture, until } from '../helpers.js';
 const temp = workspace('bps-gui-');
 const site = await fixture();
 const { startServer } = await import('../../src/server.js');
-const runtime = await startServer({ port: 0 });
+const credentials = { username: 'gui-admin', password: 'gui-test-password' };
+const authHeaders = { Authorization: `Basic ${Buffer.from(`${credentials.username}:${credentials.password}`).toString('base64')}` };
+const runtime = await startServer({ port: 0, ...credentials });
 const browser = await chromium.launch({ channel: 'chromium', headless: true });
-const context = await browser.newContext({ viewport: { width: 1365, height: 900 }, colorScheme: 'light' });
+const context = await browser.newContext({ viewport: { width: 1365, height: 900 }, colorScheme: 'light', httpCredentials: credentials });
 const page = await context.newPage();
 page.setDefaultTimeout(10000);
 const errors = [];
@@ -37,12 +39,12 @@ test('GUI：创建 JSON 任务、配置两个独立 Profile、并发运行、进
     await page.locator('#addProfileBtn').click();
     await page.locator('#pfName').fill(name); await page.locator('#pfUrl').fill(site.url);
     await page.locator('#pfTask').selectOption('gui-task'); await page.locator('#pfPrompt').fill(prompt);
-    await page.locator('#pfHeadless').check(); await page.locator('#drawerSave').click();
+    await page.locator('#drawerSave').click();
     await page.locator('#drawer').waitFor({ state: 'hidden' });
     await page.locator('.profile-card').filter({ hasText: name }).waitFor();
   }
   assert.equal(await page.locator('.profile-card').count(), 2);
-  const profileResponse = await fetch(`${runtime.origin}/api/profiles`);
+  const profileResponse = await fetch(`${runtime.origin}/api/profiles`, { headers: authHeaders });
   const profiles = await profileResponse.json();
   assert.equal(profiles[0].prompt, '研究提示词'); assert.equal(profiles[1].prompt, '独立提示词');
   assert.notEqual(profiles[0].userDataDir, profiles[1].userDataDir);
@@ -114,14 +116,14 @@ test('工作台：筛选全选、实时预览、批量停止、代理与配置�
 
 test('工作台：配置导出后可预览并导入为全新实例', { timeout: 15000 }, async () => {
   await page.getByRole('tab', { name: '实例管理' }).click();
-  const before = await (await fetch(`${runtime.origin}/api/profiles`)).json();
+  const before = await (await fetch(`${runtime.origin}/api/profiles`, { headers: authHeaders })).json();
   await page.locator('#importProfilesFile').setInputFiles({ name: 'profiles.json', mimeType: 'application/json', buffer: exportedProfiles });
   await page.locator('#importProfilesDialog').waitFor();
   assert.equal(await page.locator('#importProfilesList li').count(), 2);
   await page.locator('#confirmImportProfilesBtn').click();
   await page.locator('#importProfilesDialog').waitFor({ state: 'hidden' });
   await until(async () => await page.locator('.profile-card').count() === 4);
-  const after = await (await fetch(`${runtime.origin}/api/profiles`)).json();
+  const after = await (await fetch(`${runtime.origin}/api/profiles`, { headers: authHeaders })).json();
   assert.equal(new Set(after.map(p => p.userDataDir)).size, 4);
   assert.deepEqual(after.slice(0, 2).map(p => p.id), before.map(p => p.id));
   assert.deepEqual(errors, []);

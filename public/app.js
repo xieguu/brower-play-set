@@ -263,7 +263,7 @@ function renderProfiles() {
       <button class="pc-preview" data-act="${p.running ? 'focus' : 'launch'}" ${!p.running && p.activity ? 'disabled' : ''} aria-label="${p.running ? '查看' : '打开'} ${escapeHtml(p.name)} 的浏览器">
         <img alt="${escapeHtml(p.name)} 的浏览器预览" ${p.running && frame?.url ? `src="${frame.url}"` : 'hidden'} />
         <span class="preview-placeholder" ${p.running && frame?.url ? 'hidden' : ''}><span class="site-monogram">${escapeHtml(initials(siteName(p)))}</span><strong>${escapeHtml(siteName(p))}</strong><small>${p.running ? '正在获取实时预览' : '浏览器已停止 · 点击打开'}</small></span>
-        <span class="preview-hint" ${p.running && frame?.url ? '' : 'hidden'}>${$('#previewEnabled').checked ? '实时预览 · 点击进入' : '预览已暂停'}</span>
+        <span class="preview-hint" ${p.running && frame?.url ? '' : 'hidden'}>${$('#previewEnabled').checked ? '实时预览 · 点击放大' : '预览已暂停'}</span>
       </button>
       ${problem ? `<div class="profile-error-line" title="${escapeHtml(explainError(problem))}">${icon('circle-alert')}<span>${escapeHtml(explainError(problem))}</span></div>` : ''}
       <div class="pc-foot"><span class="pc-network" title="${escapeHtml(p.proxy?.server || '使用当前运行账号的系统网络设置')}">${icon(p.proxy ? 'shield-check' : 'network')}<span>${p.proxy ? '独立代理' : '系统网络'}</span></span><button class="btn sm ghost" data-act="${p.running || p.activity ? 'close' : 'launch'}">${icon(p.running || p.activity ? 'square' : 'play')}${p.running || p.activity ? '停止' : '打开'}</button><button class="btn sm ghost" data-act="run" ${p.activity ? 'disabled' : ''}>${icon('circle-play')}任务</button><button class="btn sm ghost" data-act="edit" ${p.running || p.activity ? 'disabled title="停止实例后可修改配置"' : ''}>${icon('settings-2')}配置</button></div>`;
@@ -271,7 +271,7 @@ function renderProfiles() {
   }
   if (state.profiles.length && !state.filter && state.statusFilter === 'all') {
     const create = document.createElement('button'); create.className = 'create-tile';
-    create.innerHTML = `${icon('plus')}<span>新建 Electron 实例</span><small>一个实例，一个独立工作空间</small>`;
+    create.innerHTML = `${icon('plus')}<span>新建后台实例</span><small>一个实例，一个独立工作空间</small>`;
     create.addEventListener('click', () => openDrawer()); grid.appendChild(create);
   }
   updateSelectedCount();
@@ -565,8 +565,6 @@ function renderSettings() {
   $('#setConcurrency').value = s.concurrency ?? 3;
   $('#setDownloadDir').value = s.defaultDownloadDir ?? '';
   $('#setLogRetention').value = s.logRetention ?? 2000;
-  $('#setHeadless').checked = !!s.defaultHeadless;
-  $('#setAutoOpen').checked = !!s.autoOpenBrowser;
   $('#runConcurrency').value = s.concurrency ?? 3;
 }
 
@@ -602,7 +600,6 @@ function openDrawer(profile = null) {
   $('#pfHeight').value = profile?.viewport?.height || 800;
   $('#pfDownloadDir').value = profile?.downloadDir || '';
   $('#pfUserAgent').value = profile?.userAgent || '';
-  $('#pfHeadless').checked = profile?.headless ?? state.settings.defaultHeadless;
   $('#pfStorageInfo').textContent = profile ? `User Data：${profile.userDataDir}\n下载目录：${profile.resolvedDownloadDir}` : '创建后自动分配独立的登录数据和下载目录。';
 
   $('#drawer').hidden = false;
@@ -633,7 +630,7 @@ async function saveProfile() {
     viewport: { width: Number($('#pfWidth').value), height: Number($('#pfHeight').value) },
     downloadDir: $('#pfDownloadDir').value.trim(),
     userAgent: $('#pfUserAgent').value.trim(),
-    headless: $('#pfHeadless').checked,
+    headless: true,
   };
 
   try {
@@ -753,7 +750,7 @@ async function runProfiles(ids, overrides = {}) {
     taskId: $('#runTask').value || undefined,
     prompt: $('#runPrompt').value || undefined,
     url: $('#runUrl').value.trim() || undefined,
-    headless: $('#runHeadless').value === '' ? undefined : $('#runHeadless').value === 'true',
+    headless: true,
     reuseBrowser: $('#runReuse').checked,
     keepOpen: $('#runKeepOpen').checked,
     ...overrides,
@@ -958,7 +955,7 @@ function bindEvents() {
     if (act === 'run') return runProfiles([id], { taskId: undefined, prompt: undefined, url: undefined, headless: undefined });
     if (act === 'launch') return launchBrowser(id);
     if (act === 'close') return closeBrowser(id);
-    if (act === 'focus') return api(`/profiles/${id}/focus`, { method: 'POST' });
+    if (act === 'focus') return window.open(`/api/profiles/${id}/preview`, '_blank', 'noopener');
     if (act === 'edit') return openDrawer(state.profiles.find((p) => p.id === id));
     if (act === 'more') {
       const btn = e.target.closest('[data-act="more"]');
@@ -1036,8 +1033,8 @@ function bindEvents() {
           concurrency: Number($('#setConcurrency').value),
           defaultDownloadDir: $('#setDownloadDir').value.trim(),
           logRetention: Number($('#setLogRetention').value),
-          defaultHeadless: $('#setHeadless').checked,
-          autoOpenBrowser: $('#setAutoOpen').checked,
+          defaultHeadless: true,
+          autoOpenBrowser: false,
         },
       });
       renderSettings();
@@ -1076,11 +1073,11 @@ async function loadMeta() {
       <dt>任务目录</dt><dd>${escapeHtml(meta.tasksDir)}</dd>
       <dt>Playwright</dt><dd>${escapeHtml(meta.playwright)}</dd>
       <dt>Playwright MCP</dt><dd>${escapeHtml(meta.mcp)}</dd>
-      <dt>Electron</dt><dd>${meta.browser.installed ? escapeHtml(meta.browser.version) : '尚未安装'}</dd>
+      <dt>Chromium</dt><dd>${meta.browser.installed ? '后台运行' : '尚未安装'}</dd>
     `;
     if (!meta.browser.installed) {
       $('#browserNotice').hidden = false;
-      $('#browserNotice').textContent = '首次使用：运行 setup.cmd，或在项目目录运行 npm ci 安装 Electron 和项目依赖。';
+      $('#browserNotice').textContent = '首次使用：在服务器项目目录运行 bash setup.sh 安装 Chromium 和项目依赖。';
     }
   } catch (error) { toast(error.message, 'error'); }
 }
@@ -1089,7 +1086,6 @@ async function loadMeta() {
    启动
    ========================================================================== */
 async function boot() {
-  if (new URLSearchParams(location.search).get('desktop') === '1') document.body.classList.add('desktop');
   try {
     const saved = localStorage.getItem('bps-theme');
     if (saved) document.documentElement.dataset.theme = saved;

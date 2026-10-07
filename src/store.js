@@ -44,8 +44,8 @@ const storedProfileSchema = profileInputSchema.required().extend({
 });
 
 export const DEFAULT_SETTINGS = Object.freeze({
-  concurrency: 3, defaultHeadless: false, defaultDownloadDir: DOWNLOAD_DIR,
-  logRetention: 2000, theme: 'auto', autoOpenBrowser: true,
+  concurrency: 3, defaultHeadless: true, defaultDownloadDir: DOWNLOAD_DIR,
+  logRetention: 2000, theme: 'auto', autoOpenBrowser: false,
 });
 export const settingsSchema = z.object({
   concurrency: z.number().int().min(1).max(20), defaultHeadless: z.boolean(),
@@ -110,7 +110,7 @@ export function normalizeProfile(input = {}, base = {}) {
   const now = new Date().toISOString();
   const merged = {
     id, name: `Profile-${id.slice(0, 4)}`, url: '', taskId: 'open-page', prompt: '', proxy: null,
-    downloadDir: '', headless: false, locale: 'zh-CN', timezone: 'Asia/Shanghai', userAgent: '',
+    downloadDir: '', headless: true, locale: 'zh-CN', timezone: 'Asia/Shanghai', userAgent: '',
     viewport: { width: 1280, height: 800 }, color: '#4f8cff',
     createdAt: now, lastRunAt: null, lastStatus: 'idle', ...base, ...patch, updatedAt: now,
   };

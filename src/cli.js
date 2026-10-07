@@ -43,7 +43,7 @@ async function main() {
   ensureDataDirs();
   if (command === 'serve') {
     const { startServer } = await import('./server.js');
-    const runtime = await startServer({ port: values.port === undefined ? PORT : Number(values.port), openBrowser: process.env.BPS_NO_OPEN !== '1' && settings.all().autoOpenBrowser });
+    const runtime = await startServer({ port: values.port === undefined ? PORT : Number(values.port) });
     out(`Browser Play Set\n${runtime.origin}\n按 Ctrl+C 退出`);
     const stop = () => runtime.stop().catch(error => { console.error(error); process.exitCode = 1; });
     process.once('SIGINT', stop); process.once('SIGTERM', stop);
@@ -72,7 +72,12 @@ async function main() {
     if (!ids.length) throw new Error('使用 --profile ID 选择 Profile');
     for (const id of ids) if (!profiles.get(id)) throw new Error(`Profile 不存在：${id}`);
     const host = HOST === '::1' ? '[::1]' : HOST;
-    return out({ mcpServers: Object.fromEntries(ids.map(id => [`profile-${id}`, { url: `http://${host}:${values.port || PORT}/mcp/${id}` }])) });
+    if (['0.0.0.0', '::'].includes(HOST) && !process.env.BPS_PUBLIC_URL) throw new Error('远程 MCP 配置请从 Web 工作台复制，或设置 BPS_PUBLIC_URL');
+    const origin = process.env.BPS_PUBLIC_URL || `http://${host}:${values.port || PORT}`;
+    return out({ mcpServers: Object.fromEntries(ids.map(id => [`profile-${id}`, {
+      url: `${origin.replace(/\/$/, '')}/mcp/${id}`,
+      ...(process.env.BPS_ADMIN_PASSWORD ? { headers: { Authorization: 'Basic BASE64_USERNAME_PASSWORD' } } : {}),
+    }])) });
   }
   if (command === 'run') {
     const ids = values.all ? profiles.all().map(p => p.id) : values.profile || positionals;

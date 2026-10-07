@@ -54,7 +54,7 @@
   <main class="app">
     <!-- ============ Profile 视图 ============ -->
     <section class="view is-active" id="view-profiles">
-      <div class="workspace-heading"><div><div class="eyebrow">BROWSER WORKSPACE</div><h1>Electron 实例 <span>统一管理，独立运行。</span></h1></div><div class="live-label"><span class="dot green"></span>本地工作台</div></div>
+      <div class="workspace-heading"><div><div class="eyebrow">BROWSER WORKSPACE</div><h1>后台实例 <span>统一管理，独立运行。</span></h1></div><div class="live-label"><span class="dot green"></span>服务器工作台</div></div>
       <div class="command-bar">
         <button class="btn primary" id="addProfileBtn"><i data-lucide="plus"></i>新建实例</button>
         <button class="btn positive" id="batchLaunchBtn" disabled><i data-lucide="play"></i>批量启动</button>
@@ -120,8 +120,7 @@
             <div class="field"><label for="runVars">传入脚本的变量</label><textarea class="input code-input" id="runVars" rows="3" placeholder='{"selector":"input[name=q]","resultSelector":"#results"}'></textarea></div>
           </details>
           <div class="field">
-            <label for="runHeadless">实例窗口</label>
-            <select class="input" id="runHeadless"><option value="">按各 Profile 设置</option><option value="false">显示 Electron 窗口</option><option value="true">后台运行（隐藏窗口）</option></select>
+            <p class="hint">服务器实例统一在后台运行。</p>
           </div>
           <div class="field-row">
             <label class="check"><input type="checkbox" id="runReuse" checked /> 复用已开浏览器</label>
@@ -201,8 +200,6 @@
             <label for="setLogRetention">内存日志保留条数</label>
             <input class="input" id="setLogRetention" type="number" min="100" max="20000" step="100" />
           </div>
-          <label class="check"><input type="checkbox" id="setHeadless" /> 默认后台运行（隐藏窗口）</label>
-          <label class="check"><input type="checkbox" id="setAutoOpen" /> 启动时打开管理界面</label>
           <button class="btn primary" id="saveSettingsBtn">保存设置</button>
         </div>
         <div class="card panel">
@@ -224,7 +221,7 @@
     </header>
     <form class="drawer-body" id="profileForm">
       <input type="hidden" id="pfId" />
-      <p class="hint">环境类型：Electron 独立窗口。每个实例独立保存登录状态。</p>
+      <p class="hint">环境类型：无头 Chromium。每个实例独立保存登录状态，通过任务或 MCP 操作。</p>
       <div class="field">
         <label for="pfName">名称 <span class="req">*</span></label>
         <input class="input" id="pfName" required maxlength="60" placeholder="例如：账号 A" />
@@ -282,10 +279,10 @@
           </div>
         </div>
         <div class="field-row">
-          <div class="field"><label for="pfWidth">初始内容宽</label><input class="input" id="pfWidth" type="number" min="320" max="3840" /></div>
-          <div class="field"><label for="pfHeight">初始内容高</label><input class="input" id="pfHeight" type="number" min="240" max="2160" /></div>
+          <div class="field"><label for="pfWidth">视口宽度</label><input class="input" id="pfWidth" type="number" min="320" max="3840" /></div>
+          <div class="field"><label for="pfHeight">视口高度</label><input class="input" id="pfHeight" type="number" min="240" max="2160" /></div>
         </div>
-        <p class="hint">页面随窗口大小自动适配；初始窗口会限制在当前屏幕可用区域内。</p>
+        <p class="hint">视口尺寸决定服务器页面渲染及截图大小。</p>
         <div class="field">
           <label for="pfDownloadDir">下载目录（留空用全局默认）</label>
           <input class="input" id="pfDownloadDir" placeholder="C:\\Users\\...\\Downloads" />
@@ -294,7 +291,6 @@
           <label for="pfUserAgent">User-Agent（可选）</label>
           <input class="input" id="pfUserAgent" placeholder="留空使用默认" />
         </div>
-        <label class="check"><input type="checkbox" id="pfHeadless" /> 后台运行（隐藏窗口）</label>
       </details>
       <p class="hint storage-hint" id="pfStorageInfo"></p>
     </form>
@@ -330,7 +326,7 @@
     <footer class="modal-foot"><button class="btn ghost" data-close-dialog="deleteDialog">取消</button><button class="btn danger" id="confirmDeleteBtn">删除</button></footer>
   </dialog>
 
-  <dialog class="modal" id="helpDialog" aria-labelledby="helpTitle"><header class="modal-head"><h2 id="helpTitle">开始使用工作台</h2><button class="icon-btn" data-close-dialog="helpDialog" aria-label="关闭帮助">×</button></header><ol class="help-steps"><li><strong>创建浏览器实例</strong><p>为实例命名，填写网站地址；需要代理时在高级选项中设置。</p></li><li><strong>打开并登录网站</strong><p>登录状态会保存在该实例中，下次打开继续使用。</p></li><li><strong>选择实例，执行任务</strong><p>可以用内置任务，也可以在任务脚本中编写自己的 JSON 步骤。</p></li><li><strong>查看实时预览与结果</strong><p>首页每隔数秒刷新预览。点击运行中的预览可切换到浏览器；任务产物在运行控制台查看。</p></li></ol><p class="hint">MCP 连接入口位于实例卡片的更多菜单中。</p></dialog>
+  <dialog class="modal" id="helpDialog" aria-labelledby="helpTitle"><header class="modal-head"><h2 id="helpTitle">开始使用工作台</h2><button class="icon-btn" data-close-dialog="helpDialog" aria-label="关闭帮助">×</button></header><ol class="help-steps"><li><strong>创建浏览器实例</strong><p>为实例命名，填写网站地址；需要代理时在高级选项中设置。</p></li><li><strong>后台打开网站</strong><p>通过任务或 MCP 操作网站，登录状态保存在该实例中。</p></li><li><strong>选择实例，执行任务</strong><p>可以用内置任务，也可以在任务脚本中编写自己的 JSON 步骤。</p></li><li><strong>查看实时预览与结果</strong><p>首页每隔数秒刷新预览。点击运行中的预览可查看截图；任务产物在运行控制台查看。</p></li></ol><p class="hint">MCP 连接入口位于实例卡片的更多菜单中。</p></dialog>
   <!-- 全局提示 -->
   <div class="toasts" id="toasts"></div>
 

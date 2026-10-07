@@ -3,7 +3,6 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
-import open from 'open';
 import { HOST, PORT, PUBLIC_DIR, DATA_DIR, TASKS_DIR, VERSION } from './config.js';
 import { ensureDataDirs, profiles, profileInputSchema, settings, userDataDir, resolveDownloadDir } from './store.js';
 import { bus, recentLogs, clearLogs, logger, setLogRetention } from './logger.js';
@@ -14,29 +13,19 @@ import { activity, activities, assertAvailable } from './activity.js';
 import { handleMcp, disconnectMcp, closeAllMcp, mcpSessions } from './mcp-http.js';
 import { AppError, parse } from './errors.js';
 import { createSystemMonitor, capturePreview, currentPage } from './monitor.js';
+import { createServerAccess } from './server-access.js';
 
 const require = createRequire(import.meta.url);
 const wrap = fn => (req, res, next) => Promise.resolve().then(() => fn(req, res, next)).catch(next);
 const count = (value, initial, max = 200) => value === undefined ? initial : Math.max(1, Math.min(Number(value) || initial, max));
-
-function localOnly(req, res, next) {
-  let host;
-  try { host = new URL(`http://${req.headers.host}`); } catch { return res.status(403).json({ error: '无效 Host' }); }
-  if (!['127.0.0.1', 'localhost', '[::1]'].includes(host.hostname) || Number(host.port || 80) !== req.socket.localPort) {
-    return res.status(403).json({ error: '只接受本机地址请求' });
-  }
-  if (req.headers.origin && req.headers.origin !== host.origin) return res.status(403).json({ error: '拒绝跨站请求' });
-  if (req.headers['sec-fetch-site'] === 'cross-site') return res.status(403).json({ error: '拒绝跨站请求' });
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  next();
-}
 
 function editable(id) {
   assertAvailable(id);
   if (isRunning(id)) throw new AppError('请先关闭此 Profile 的浏览器，再修改配置', 409);
 }
 
-export function createApp() {
+export function createApp({ host = HOST, ...accessOptions } = {}) {
+  const access = createServerAccess({ host, ...accessOptions });
   ensureDataDirs();
   profiles.all();
   setLogRetention(settings.all().logRetention);
@@ -44,7 +33,7 @@ export function createApp() {
   const systemMetrics = createSystemMonitor();
   const eventClients = new Set();
   app.disable('x-powered-by');
-  app.use(localOnly);
+  app.use(access.middleware);
   app.use(express.json({ limit: '2mb' }));
   app.use('/api', (req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
   const api = express.Router();
@@ -54,6 +43,7 @@ export function createApp() {
     version: VERSION, platform: process.platform, node: process.version, dataDir: DATA_DIR, tasksDir: TASKS_DIR,
     playwright: require('playwright/package.json').version, mcp: require('@playwright/mcp/package.json').version,
     browser: browserInfo(), queue: queueStatus(),
+    serverMode: true, authentication: access.authenticated,
   }));
   api.get('/settings', (req, res) => res.json(settings.all()));
   api.get('/system', (req, res) => res.json(systemMetrics()));
@@ -113,8 +103,8 @@ export function createApp() {
   }));
   api.post('/profiles/:id/focus', wrap(async (req, res) => {
     if (!profiles.get(req.params.id)) throw new AppError('Profile 不存在', 404);
-    const { session, page } = currentPage(req.params.id);
-    await session.focus(page);
+    const { page } = currentPage(req.params.id);
+    await page.bringToFront();
     res.json({ ok: true });
   }));
   api.post('/profiles/:id/launch', wrap(async (req, res) => {
@@ -148,7 +138,8 @@ export function createApp() {
   api.get('/mcp', (req, res) => res.json(mcpSessions()));
   api.get('/profiles/:id/mcp-config', (req, res) => {
     if (!profiles.get(req.params.id)) throw new AppError('Profile 不存在', 404);
-    res.json({ mcpServers: { [`profile-${req.params.id}`]: { url: `http://${req.headers.host}/mcp/${req.params.id}` } } });
+    res.json({ mcpServers: { [`profile-${req.params.id}`]: { url: `${access.origin(req)}/mcp/${req.params.id}`,
+      ...(access.authenticated ? { headers: { Authorization: 'Basic BASE64_USERNAME_PASSWORD' } } : {}) } } });
   });
   api.post('/profiles/:id/mcp-disconnect', wrap(async (req, res) => res.json({ disconnected: await disconnectMcp(req.params.id) })));
   app.all('/mcp/:id', wrap(handleMcp));
@@ -188,15 +179,14 @@ export function createApp() {
   return app;
 }
 
-export async function startServer({ port = PORT, host = HOST, openBrowser = false } = {}) {
-  const app = createApp();
+export async function startServer({ port = PORT, host = HOST, ...accessOptions } = {}) {
+  const app = createApp({ host, ...accessOptions });
   loadRunHistory();
   const server = await new Promise((resolve, reject) => {
     const listener = app.listen(port, host, () => resolve(listener)); listener.once('error', reject);
   });
   const origin = `http://${host === '::1' ? '[::1]' : host}:${server.address().port}`;
   logger.info(`Browser Play Set v${VERSION}：${origin}`);
-  if (openBrowser) open(origin).catch(error => logger.error(`打开界面失败，请访问 ${origin}：${error.message}`));
   return {
     app, server, origin,
     async stop() {
@@ -208,7 +198,7 @@ export async function startServer({ port = PORT, host = HOST, openBrowser = fals
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  const runtime = await startServer({ openBrowser: process.env.BPS_NO_OPEN !== '1' && settings.all().autoOpenBrowser });
+  const runtime = await startServer();
   console.log(`Browser Play Set\n${runtime.origin}\n数据目录：${DATA_DIR}\n按 Ctrl+C 退出`);
   let exiting = false;
   const shutdown = async () => {

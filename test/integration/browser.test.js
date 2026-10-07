@@ -34,7 +34,7 @@ async function storage(page, value) {
   }, value);
 }
 
-test('Electron：Cookie / LocalStorage / IndexedDB / CacheStorage / HTTP 缓存隔离且重启保持', { timeout: 60000 }, async () => {
+test('Chromium：Cookie / LocalStorage / IndexedDB / CacheStorage / HTTP 缓存隔离且重启保持', { timeout: 60000 }, async () => {
   const a = profiles.add({ name: 'Alpha', url: site.url, headless: true });
   const b = profiles.add({ name: 'Beta', url: site.url, headless: true });
   const [sa, sb] = await Promise.all([launch(a), launch(b)]);

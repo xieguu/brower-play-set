@@ -39,9 +39,8 @@ test('工作台：真实资源数据、预览、窗口聚焦和关闭后的预�
   assert.deepEqual([...bytes.slice(0, 2)], [255, 216]);
   assert.ok(bytes.length > 1000);
   assert.equal((await api(`/profiles/${profile.id}/focus`, { method: 'POST' })).response.status, 200);
-  assert.equal(await getSession(profile.id).application.evaluate(({ BrowserWindow }) =>
-    BrowserWindow.getAllWindows()[0].isVisible()), true);
-  assert.equal((await api('/meta')).body.browser.engine, 'electron');
+  assert.equal((await api('/sessions')).body.find(s => s.profileId === profile.id).headless, true);
+  assert.equal((await api('/meta')).body.browser.engine, 'chromium');
   await api(`/profiles/${profile.id}/close`, { method: 'POST' });
   assert.equal((await api(`/profiles/${profile.id}/preview`)).response.status, 409);
   await api(`/profiles/${profile.id}`, { method: 'DELETE' });
@@ -118,7 +117,7 @@ test('MCP Streamable HTTP：两个 Profile 独立、调用官方工具、互斥�
     assert.match(JSON.stringify(snapshot), /Automation Fixture/);
     const newWindow = await ca.callTool({ name: 'browser_tabs', arguments: { action: 'new' } });
     assert.ok(!newWindow.isError, JSON.stringify(newWindow));
-    assert.equal(await getSession(a.id).application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length), 2);
+    assert.equal(getSession(a.id).context.pages().length, 2);
     const navigate = await ca.callTool({ name: 'browser_navigate', arguments: { url: site.url } });
     assert.ok(!navigate.isError, JSON.stringify(navigate));
     assert.equal(await getSession(a.id).context.pages().at(-1).evaluate(() => localStorage.getItem('identity')), 'Remote A');

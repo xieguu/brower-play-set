@@ -1,6 +1,6 @@
 # Browser Play Set
 
-轻量、开源、Windows 优先的多 Profile 浏览器自动化工具。使用桌面工作台或本地 Web GUI 管理独立 Electron 登录环境，通过 **Playwright + 官方 Playwright MCP** 执行通用任务。采用 MIT 许可证。
+`ubt` 分支：Ubuntu 最小服务器版。一个 Node.js Web 服务 + 无头 Chromium，通过 **服务器 IP:8787** 管理独立 Profile，使用 **Playwright + 官方 Playwright MCP** 执行任务。采用 MIT 许可证。桌面版保留在 `electron` 分支。
 
 Profile 管理思路参考 [gpt-set](https://github.com/xieguu/gpt-set)。网站地址由用户填写，不绑定 ChatGPT 或任何其他站点。
 
@@ -8,32 +8,44 @@ Profile 管理思路参考 [gpt-set](https://github.com/xieguu/gpt-set)。网站
 
 ## 启动
 
-需要 **Node.js 22 或更新版本**。Windows 10/11 首次双击 `setup.cmd` 安装依赖（包含 Electron），以后双击 `start.cmd`。
+在已安装 **Node.js 22+、npm、Git** 的 Ubuntu 22.04/24.04 上运行：
 
 也可以从源码目录运行：
 
-```powershell
-npm ci
-npm start
+```bash
+git clone -b ubt --single-branch https://github.com/xieguu/brower-play-set.git
+cd brower-play-set
+bash setup.sh
+nano .env                   # 填写 BPS_ADMIN_PASSWORD
+bash start.sh
 ```
 
-`npm start` 打开 Electron 桌面工作台。关闭工作台会停止任务并关闭实例窗口。也可运行 `npm run start:web`，通过 **http://127.0.0.1:8787** 管理；网页版按 `Ctrl+C` 退出。
+打开 **http://服务器IP:8787**，输入 `.env` 中的用户名和密码。默认用户名 `admin`，密码必须自行填写。服务器防火墙/云安全组需放行 TCP 8787。`setup.sh` 使用 [Playwright 官方安装方式](https://playwright.dev/docs/browsers#install-system-dependencies)安装 Chromium 及系统依赖，安装系统包时可能需要 sudo。
 
-两种管理入口创建的 Profile 都使用独立 Electron 进程和原生窗口，网站页面禁用 Node 集成并开启上下文隔离与沙箱。每个 Profile 使用自己的 `data/userdata/<id>/`，网站存储继续放在其 `Default/` 子目录。后台运行时窗口隐藏，点击实时预览可显示并聚焦窗口；兼容保留的 `headless` 字段表示隐藏窗口，不是无显示服务模式。无需数据库、Docker、云端账号或前端构建。
+部署只有 Node 服务和 Chromium，无需桌面环境、Electron、Xvfb、noVNC、Docker、数据库或前端构建。关闭网页不停止服务；终端按 `Ctrl+C` 会停止任务和实例。需要脱离终端运行时：
 
-`viewport` 配置指定初始窗口内容尺寸（逻辑像素），超过屏幕工作区时自动收进屏幕内。页面使用原生视口，随窗口拉伸、最大化和系统 DPI 缩放适配，不强制模拟固定分辨率。
+```bash
+mkdir -p data
+nohup bash start.sh >data/server.log 2>&1 &
+echo $! >data/server.pid
+# 停止：kill "$(cat data/server.pid)"
+```
+
+所有实例强制使用无头模式，兼容导入的 `headless` 字段不改变服务器运行模式。每个 Profile 使用自己的 `data/userdata/<id>/`；`viewport` 控制页面渲染及截图大小。网页提供预览截图，网站交互通过任务或 MCP 完成。备份 `data/`、`tasks/` 和 `.env` 即可保留配置、登录状态和任务；Electron User Data 不自动迁移。
+
+`bash start.sh` 加载 `.env`。开发时直接 `npm start` 使用当前进程环境变量，默认仅监听 `127.0.0.1:8787`。
 
 ## 使用
 
 1. **创建 Profile**：填写名称、任意网站 URL、默认任务、提示词和代理。每个 Profile 都有自己的 User Data 目录。
-2. **手动登录**：点击卡片上的「打开」。登录后关闭窗口，Cookie、LocalStorage、IndexedDB、HTTP 缓存、CacheStorage 等保存在该 Profile 内。
+2. **后台打开**：点击卡片上的「打开」，通过任务或 MCP 操作网站。Cookie、LocalStorage、IndexedDB、HTTP 缓存、CacheStorage 等保存在该 Profile 内。
 3. **独立运行**：勾选多个 Profile，在运行页设置并发数。默认使用各 Profile 自己的任务、网址和提示词；可为本批次指定覆盖值。
 4. **查看结果**：运行页显示排队、当前步骤、成功、失败和取消状态。「详情 / 产物」可查看结果 JSON、下载截图与文件。日志可按 Profile 和级别过滤。
 5. **管理任务**：从「任务」页新建、导入、编辑 JSON；JS 插件放入 `tasks/` 后点击「重新加载」。
 
 提示词是传给任务的 `{{prompt}}` 参数。JSON 步骤决定如何使用它；MCP 可供外部 AI 客户端调用。本项目不内置模型调用。
 
-并发数量限制整个进程内正在执行的任务，多个批次共享上限。排队中的 Profile 也被预留，重复提交返回明确错误。任务结束默认关闭浏览器；选择「结束后保持打开」后，需要手动关闭窗口释放浏览器资源。
+并发数量限制整个进程内正在执行的任务，多个批次共享上限。排队中的 Profile 也被预留，重复提交返回明确错误。任务结束默认关闭浏览器；选择「结束后保持打开」后，点击实例「关闭」释放资源。
 
 「复制 Profile」只复制配置，生成新的空白 User Data，不复制登录状态。修改正在打开的 Profile 配置，需要先关闭该浏览器。
 
@@ -81,13 +93,14 @@ npm start
 {
   "mcpServers": {
     "my-profile": {
-      "url": "http://127.0.0.1:8787/mcp/PROFILE_ID"
+      "url": "http://SERVER_IP:8787/mcp/PROFILE_ID",
+      "headers": { "Authorization": "Basic BASE64_USERNAME_PASSWORD" }
     }
   }
 }
 ```
 
-使用支持 **Streamable HTTP** 的 MCP 客户端。管理程序保持运行，客户端即可调用官方的 `browser_navigate`、`browser_snapshot`、`browser_click`、`browser_type`、`browser_file_upload` 等工具。
+将 `BASE64_USERNAME_PASSWORD` 替换为 `.env` 中 `用户名:密码` 的 Base64 编码；在服务器项目目录运行 `node --env-file=.env -e 'console.log(Buffer.from(process.env.BPS_ADMIN_USER+":"+process.env.BPS_ADMIN_PASSWORD).toString("base64"))'` 获取。配置中的地址由访问工作台的地址生成。使用支持 **Streamable HTTP** 和自定义请求头的 MCP 客户端，即可调用官方 `browser_navigate`、`browser_snapshot`、`browser_click`、`browser_type`、`browser_file_upload` 等工具。
 
 每条 MCP 连接绑定一个 Profile，共用该 Profile 的持久上下文和代理。连接期间阻止同一 Profile 启动其他任务。客户端终止 MCP 会话后关闭浏览器并释放占用；客户端意外退出时，可在 MCP 面板点击「断开此 Profile 的 MCP」。多个 Profile 的 MCP 可同时连接。
 
@@ -106,29 +119,28 @@ npm start
 }
 ```
 
-通过官方 `createConnection(config, contextGetter)` 接入已有 Electron 上下文，使用 MCP SDK 传输和工具协议。MCP 不另起浏览器；Playwright Electron 启动器管理实例的调试连接。新页面和网站弹窗均创建在同一实例中，共享该实例会话。
+通过官方 `createConnection(config, contextGetter)` 接入已有 Chromium 上下文，使用 MCP SDK 传输和工具协议。新页面与网站弹窗共享所属实例会话。
 
 ## 数据与架构
 
 ```text
 src/
   store.js             Profile / 设置校验、原子写入、配置文件锁
-  browser.js           Electron 启动、窗口控制、跨进程 User Data 锁
-  profile-window.cjs   每个 Profile 的 Electron 入口、独立会话与代理
-  desktop.cjs          管理工作台的 Electron 入口
+  browser.js           无头 Chromium、持久化上下文、跨进程 User Data 锁
+  server-access.js     HTTP Basic 登录、Host / Origin 检查
   downloads.js         手动与自动下载统一保存
   activity.js          Profile 占用管理
   orchestrator.js      p-queue 全局调度、取消、进度、运行记录
   tasks/               任务加载、Zod 校验、模板、通用操作、执行器
   mcp.js               官方 Playwright MCP 接入
   mcp-http.js          按 Profile 提供 Streamable HTTP
-  server.js / cli.js   本地 GUI 接口与命令行
+  server.js / cli.js   Web GUI 接口与命令行
 public/                原生 HTML / CSS / JavaScript，零构建
 tasks/                 用户 JSON / JS 插件
 data/
   profiles.json        Profile 配置
   settings.json        全局设置
-  userdata/<id>/       独立 Electron User Data，Default/ 保存网站数据
+  userdata/<id>/       独立 Chromium User Data，Default/ 保存网站数据
   downloads/<id>/      默认下载位置；任务下载位于各自 run-id 子目录
   artifacts/<id>/      每次任务的 run.json、result.json、截图及 MCP 产物
   logs/                按 UTC 日期保存的 JSONL 日志
@@ -149,31 +161,32 @@ node src/cli.js mcp-config --profile PROFILE_ID
 node src/cli.js remove PROFILE_ID --purge
 ```
 
-`run` 中未提供的任务、网址、提示词和窗口显示设置均沿用各 Profile 配置。`--headless` 表示后台运行（隐藏 Electron 窗口），`--keep-open` 保持实例运行；`--fresh` 关闭已有实例再启动。失败或取消的批次返回非零退出码。
+`run` 中未提供的任务、网址和提示词沿用各 Profile 配置。所有实例均无头运行；`--keep-open` 保持实例运行，`--fresh` 关闭已有实例再启动。失败或取消的批次返回非零退出码。CLI 加载部署配置时使用 `node --env-file=.env src/cli.js ...`。
 
 | 环境变量 | 默认值 | 用途 |
 | --- | --- | --- |
 | `BPS_DATA_DIR` | `<项目>/data` | Profile、登录数据、下载与日志根目录 |
 | `BPS_TASKS_DIR` | `<项目>/tasks` | 自定义任务目录 |
 | `PORT` | `8787` | 管理界面与 MCP 端口 |
-| `HOST` | `127.0.0.1` | 管理程序回环监听地址 |
-| `BPS_NO_OPEN` | 未设置 | 设为 `1` 时不自动打开管理界面 |
+| `HOST` | `127.0.0.1` | `.env.example` 设置为 `0.0.0.0`，供远程访问 |
+| `BPS_ADMIN_USER` | 未设置 | 管理员用户名，对外监听时必填 |
+| `BPS_ADMIN_PASSWORD` | 未设置 | 管理员密码，对外监听时必填 |
+| `BPS_PUBLIC_URL` | 未设置 | 可选的外部根地址，如 `https://bps.example.com` |
 
-管理接口仅监听本机并校验 Host / Origin；网站访问由 Profile 的 URL 和代理配置决定。
+登录覆盖管理页、API、预览、事件流、下载与 MCP。使用 HTTPS 反向代理时设置 `BPS_PUBLIC_URL`，代理保留原始 Host，并关闭 SSE 响应缓冲。网站访问由各 Profile 的 URL 和代理配置决定。
 
 ## 验证
 
 ```powershell
 npm run check             # 所有 JS 文件语法检查
 npm test                  # 配置、模板、任务文件和路径检查
-npm run browsers          # 仅 Web GUI 自动化测试需要额外安装 Chromium
-npm run test:integration  # Electron 实例、代理、MCP HTTP、Web GUI 全流程
-npm run test:desktop      # 桌面工作台与 Electron 实例完整流程
+npm run browsers          # 安装 Chromium
+npm run test:integration  # 无头实例、代理、MCP HTTP、Web GUI 全流程
 npm run smoke             # 浏览器核心集成检查
 ```
 
 集成测试使用本机测试网页和临时 User Data，不需要第三方账号。覆盖存储与缓存隔离、重启持久化、代理认证、跨进程锁、全局并发、取消、文件上传下载、MCP 与 GUI。GUI 检查截图保存在 `test-results/`。
 
-Linux 上 Electron 需要显示服务；CI 使用 `xvfb-run -a npm run test:integration` 和 `xvfb-run -a npm run test:desktop`。
+CI 在 Ubuntu 和 Windows 上直接运行无头集成测试，Ubuntu 不需要显示服务。
 
-依赖：[Playwright](https://github.com/microsoft/playwright)、[Playwright MCP](https://github.com/microsoft/playwright-mcp)、[MCP SDK](https://github.com/modelcontextprotocol/typescript-sdk)、Express、p-queue、Zod、proper-lockfile、write-file-atomic、open。依赖许可证保留在各包中；项目许可证见 [LICENSE](LICENSE)。
+依赖：[Playwright](https://github.com/microsoft/playwright)、[Playwright MCP](https://github.com/microsoft/playwright-mcp)、[MCP SDK](https://github.com/modelcontextprotocol/typescript-sdk)、Express、basic-auth、p-queue、Zod、proper-lockfile、write-file-atomic。依赖许可证保留在各包中；项目许可证见 [LICENSE](LICENSE)。

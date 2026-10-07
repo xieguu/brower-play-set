@@ -11,8 +11,6 @@
 .topbar-actions .icon-btn { border:0; width:28px; height:28px; }
 .top-link { display:inline-flex; align-items:center; gap:6px; padding:4px; background:none; border:0; color:var(--text-muted); font:inherit; cursor:pointer; }
 .top-divider { width:1px; height:16px; background:var(--border); }
-.desktop .topbar { -webkit-app-region:drag; padding-right:150px; }
-.desktop .topbar-actions { -webkit-app-region:no-drag; }
 .sidebar { position:fixed; left:0; top:var(--topbar-h); bottom:0; width:var(--sidebar-w); padding:26px 12px 16px; display:flex; flex-direction:column; border-right:1px solid var(--border); background:var(--surface); z-index:30; }
 .workspace-label { display:flex; align-items:center; justify-content:space-between; padding:0 12px 18px; color:var(--text-faint); letter-spacing:1.4px; font-size:9px; font-weight:650; }
 .workspace-label span { border:1px solid var(--border); padding:1px 5px; border-radius:4px; letter-spacing:0; font-size:10px; }
