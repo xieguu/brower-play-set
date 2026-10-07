@@ -1,5 +1,6 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
+import WebSocket from 'ws';
 import { workspace } from './helpers.js';
 
 const temp = workspace('bps-access-');
@@ -17,7 +18,7 @@ test('public listener refuses missing or incomplete credentials', async () => {
 });
 
 test('authentication covers UI, API, previews, SSE, artifacts and MCP', async () => {
-  for (const route of ['/', '/app.js', '/api/meta', '/api/events', '/api/profiles/id/preview', '/api/runs/id/artifacts/0', '/mcp/id']) {
+  for (const route of ['/', '/app.js', '/control.html', '/control.js', '/vendor/novnc/core/rfb.js', '/api/meta', '/api/events', '/api/profiles/id/preview', '/api/runs/id/artifacts/0', '/mcp/id']) {
     const response = await fetch(origin + route);
     assert.equal(response.status, 401, route);
     assert.match(response.headers.get('www-authenticate'), /^Basic /);
@@ -31,6 +32,21 @@ test('authentication covers UI, API, previews, SSE, artifacts and MCP', async ()
   const meta = await response.json();
   assert.equal(meta.authentication, true);
   assert.equal(meta.browser.headless, true);
+});
+
+test('remote WebSocket enforces authentication and same-origin before upgrade', async () => {
+  const url = `${origin.replace('http:', 'ws:')}/api/profiles/aaaaaaaaaaaa/control-socket?token=${'b'.repeat(64)}`;
+  for (const [headers, expected] of [[{ Origin: origin }, 401],
+    [{ Authorization: authorization, Origin: 'https://evil.invalid' }, 403],
+    [{ Authorization: authorization }, 403]]) {
+    const status = await new Promise((resolve, reject) => {
+      const ws = new WebSocket(url, { headers });
+      ws.on('unexpected-response', (_req, response) => { response.resume(); ws.terminate(); resolve(response.statusCode); });
+      ws.on('open', () => { ws.close(); reject(new Error('unauthorized upgrade')); });
+      ws.on('error', () => {});
+    });
+    assert.equal(status, expected);
+  }
 });
 
 test('authenticated cross-site requests are rejected; same-origin SSE works', async () => {

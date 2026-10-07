@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>远程浏览器 · Browser Play Set</title>
+  <link rel="stylesheet" href="/control.css" />
+  <script type="module" src="/control.js"></script>
+</head>
+<body>
+  <header>
+    <a href="/#profiles" target="_blank" rel="noopener">工作台</a>
+    <strong id="name">远程浏览器</strong>
+    <span id="status" role="status">正在连接…</span>
+    <button id="reconnect" hidden>重新连接</button>
+    <button id="disconnect" disabled>断开操作</button>
+    <label><input id="fit" type="checkbox" checked />适应窗口</label>
+    <button id="fullscreen">全屏</button>
+  </header>
+  <form id="navigate" class="toolbar">
+    <button type="button" data-nav="back" disabled aria-label="后退">←</button>
+    <button type="button" data-nav="forward" disabled aria-label="前进">→</button>
+    <button type="button" data-nav="reload" disabled aria-label="刷新">↻</button>
+    <input id="url" aria-label="网址" placeholder="https://example.com" type="url" required />
+    <button id="go" disabled>访问</button>
+  </form>
+  <details id="text-panel">
+    <summary>中文输入 / 粘贴文字</summary>
+    <form id="insert">
+      <label for="text">先点击远程网页的输入框，再在此输入文字并发送。</label>
+      <textarea id="text" rows="2" maxlength="20000" autocomplete="off" spellcheck="false"></textarea>
+      <button id="send" disabled>输入到网页</button>
+    </form>
+  </details>
+  <p id="error" role="alert" hidden></p>
+  <main id="screen" aria-label="可操作的远程浏览器"></main>
+  <footer>可直接点击、输入、滚动。关闭此页会释放操作权，浏览器和登录状态继续保留。</footer>
+</body>
+</html>

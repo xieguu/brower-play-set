@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { setTimeout as delay } from 'node:timers/promises';
 
 export function workspace(prefix) {
+  process.env.BPS_REMOTE_DESKTOP = '0';
   const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   process.env.BPS_DATA_DIR = path.join(root, 'data');
   process.env.BPS_TASKS_DIR = path.join(root, 'tasks');

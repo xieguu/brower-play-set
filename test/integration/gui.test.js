@@ -90,7 +90,7 @@ test('工作台：筛选全选、实时预览、批量停止、代理与配置�
   await page.locator('#batchLaunchBtn').click();
   await until(async () => (await page.locator('.pc-status').allTextContents()).every(s => s.includes('运行中')), 20000);
   await until(async () => await page.locator('.pc-preview img:not([hidden])').count() === 2, 15000);
-  assert.equal(await page.locator('.preview-hint:not([hidden])').first().textContent(), '实时预览 · 点击进入');
+  assert.equal(await page.locator('.preview-hint:not([hidden])').first().textContent(), '实时预览 · 点击操作');
   await page.locator('#previewEnabled').uncheck();
   assert.equal(await page.locator('.preview-hint:not([hidden])').first().textContent(), '预览已暂停');
   await page.locator('#previewEnabled').check();

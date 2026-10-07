@@ -5,7 +5,10 @@ const owners = new Map();
 export function activity(profileId) { return owners.get(profileId) || null; }
 export function activities() { return [...owners].map(([profileId, value]) => ({ profileId, activity: value })); }
 export function assertAvailable(profileId) {
-  if (owners.has(profileId)) throw new AppError(`Profile 正被${owners.get(profileId).kind === 'mcp' ? ' MCP 客户端' : '任务'}占用，请先停止或断开`, 409);
+  if (owners.has(profileId)) {
+    const labels = { mcp: 'MCP 客户端', task: '任务', remote: '网页远程操作' };
+    throw new AppError(`Profile 正被${labels[owners.get(profileId).kind]}占用，请先停止或断开`, 409);
+  }
 }
 
 /** Reservations cover queued work as well as running work. */

@@ -14,6 +14,7 @@ import { handleMcp, disconnectMcp, closeAllMcp, mcpSessions } from './mcp-http.j
 import { AppError, parse } from './errors.js';
 import { createSystemMonitor, capturePreview, currentPage } from './monitor.js';
 import { createServerAccess } from './server-access.js';
+import { desktopInfo, controlCommand, disconnectControl, attachRemoteControl } from './remote-control.js';
 
 const require = createRequire(import.meta.url);
 const wrap = fn => (req, res, next) => Promise.resolve().then(() => fn(req, res, next)).catch(next);
@@ -30,6 +31,7 @@ export function createApp({ host = HOST, ...accessOptions } = {}) {
   profiles.all();
   setLogRetention(settings.all().logRetention);
   const app = express();
+  app.locals.access = access;
   const systemMetrics = createSystemMonitor();
   const eventClients = new Set();
   app.disable('x-powered-by');
@@ -95,6 +97,13 @@ export function createApp({ host = HOST, ...accessOptions } = {}) {
   }));
 
   api.get('/sessions', (req, res) => res.json(activeSessions()));
+  api.get('/profiles/:id/desktop', (req, res) => res.json(desktopInfo(req.params.id)));
+  api.post('/profiles/:id/control', wrap(async (req, res) => {
+    res.json(await controlCommand(req.params.id, req.headers['x-control-token'], req.body));
+  }));
+  api.post('/profiles/:id/control-disconnect', wrap(async (req, res) => {
+    await disconnectControl(req.params.id); res.json({ ok: true });
+  }));
   api.get('/profiles/:id/preview', wrap(async (req, res) => {
     if (!profiles.get(req.params.id)) throw new AppError('Profile 不存在', 404);
     const { buffer, capturedAt } = await capturePreview(req.params.id);
@@ -168,6 +177,7 @@ export function createApp({ host = HOST, ...accessOptions } = {}) {
   });
   app.use('/api', (req, res) => res.status(404).json({ error: '接口不存在' }));
   app.get('/vendor/lucide.js', (req, res) => res.sendFile(require.resolve('lucide/dist/umd/lucide.js')));
+  app.use('/vendor/novnc', express.static(path.resolve(path.dirname(require.resolve('@novnc/novnc')), '..')));
   app.use(express.static(PUBLIC_DIR));
   app.use((err, req, res, next) => {
     if (res.headersSent) return next(err);
@@ -186,11 +196,12 @@ export async function startServer({ port = PORT, host = HOST, ...accessOptions }
     const listener = app.listen(port, host, () => resolve(listener)); listener.once('error', reject);
   });
   const origin = `http://${host === '::1' ? '[::1]' : host}:${server.address().port}`;
+  const closeRemoteControl = attachRemoteControl(server, app.locals.access);
   logger.info(`Browser Play Set v${VERSION}：${origin}`);
   return {
     app, server, origin,
     async stop() {
-      await stopAllRuns(); await closeAllMcp(); await closeAll();
+      await closeRemoteControl(); await stopAllRuns(); await closeAllMcp(); await closeAll();
       app.locals.closeEventClients();
       await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
     },

@@ -5,6 +5,7 @@ import { userDataDir, resolveDownloadDir } from './store.js';
 import { scopedLogger, bus } from './logger.js';
 import { AppError } from './errors.js';
 import { trackDownloads } from './downloads.js';
+import { createVirtualDisplay, remoteDesktopEnabled } from './virtual-display.js';
 
 const sessions = new Map();
 const launches = new Map();
@@ -13,7 +14,7 @@ const closings = new Map();
 function launchOptions(profile) {
   return {
     channel: 'chromium',
-    headless: true,
+    headless: !remoteDesktopEnabled(),
     viewport: profile.viewport, acceptDownloads: true,
     locale: profile.locale, timezoneId: profile.timezone,
     ...(profile.userAgent ? { userAgent: profile.userAgent } : {}),
@@ -41,18 +42,30 @@ async function launchFresh(profile, options, signature) {
   const logger = scopedLogger(profile);
   const unlock = await acquireDirectory(profile.id);
   let releasePromise;
-  const release = () => releasePromise ||= unlock();
+  let display, context;
+  const release = () => releasePromise ||= (async () => {
+    try { if (display) await display.close(); } finally { await unlock(); }
+  })();
   try {
     logger.info(`启动浏览器（${options.headless ? '无头' : '有头'}模式）`);
-    const context = await chromium.launchPersistentContext(userDataDir(profile.id), options);
+    if (!options.headless) display = await createVirtualDisplay(profile.viewport);
+    context = await chromium.launchPersistentContext(userDataDir(profile.id), { ...options,
+      ...(display ? { env: { ...process.env, DISPLAY: display.name },
+        args: ['--window-position=0,0', `--window-size=${display.width},${display.height}`] } : {}) });
     context.setDefaultTimeout(30000);
     const session = {
-      context, profile, signature, startedAt: Date.now(), closed: false,
+      context, display, profile, signature, startedAt: Date.now(), closed: false,
       downloadDir: resolveDownloadDir(profile), onDownload: null, release,
     };
     fs.mkdirSync(session.downloadDir, { recursive: true });
     session.downloads = trackDownloads(context, session, logger);
     sessions.set(profile.id, session);
+    if (display) display.child.once('exit', () => {
+      if (!session.closed) {
+        logger.error('虚拟屏幕退出，关闭对应浏览器实例');
+        context.close().catch(error => logger.error(error.message));
+      }
+    });
     context.once('close', () => {
       session.closed = true;
       if (sessions.get(profile.id) === session) sessions.delete(profile.id);
@@ -62,7 +75,7 @@ async function launchFresh(profile, options, signature) {
     bus.emit('sessions');
     return session;
   } catch (error) {
-    await release();
+    try { if (context) await context.close(); } finally { await release(); }
     throw new AppError(`浏览器启动失败：${error.message}`, 500, { cause: error });
   }
 }
@@ -116,5 +129,6 @@ export function activeSessions() {
 
 export function browserInfo() {
   const executablePath = chromium.executablePath();
-  return { engine: 'chromium', headless: true, installed: fs.existsSync(executablePath), executablePath };
+  return { engine: 'chromium', headless: !remoteDesktopEnabled(), remoteControl: remoteDesktopEnabled(),
+    installed: fs.existsSync(executablePath), executablePath };
 }

@@ -1,6 +1,6 @@
 # Browser Play Set
 
-`ubt` 分支：Ubuntu 最小服务器版。一个 Node.js Web 服务 + 无头 Chromium，通过 **服务器 IP:8787** 管理独立 Profile，使用 **Playwright + 官方 Playwright MCP** 执行任务。采用 MIT 许可证。桌面版保留在 `electron` 分支。
+`ubt` 分支：Ubuntu 服务器版。通过 **服务器 IP:8787** 或 SSH 转发管理独立 Chromium Profile，点击实例预览可进入网页远程操作，支持鼠标、键盘、滚动和登录；也可使用 **Playwright + 官方 Playwright MCP** 执行任务。采用 MIT 许可证。桌面版保留在 `electron` 分支。
 
 Profile 管理思路参考 [gpt-set](https://github.com/xieguu/gpt-set)。网站地址由用户填写，不绑定 ChatGPT 或任何其他站点。
 
@@ -20,7 +20,7 @@ bash start.sh
 
 打开 **http://服务器IP:8787**，输入 `.env` 中的用户名和密码。默认用户名 `admin`，密码必须自行填写。服务器防火墙/云安全组需放行 TCP 8787。`setup.sh` 使用 [Playwright 官方安装方式](https://playwright.dev/docs/browsers#install-system-dependencies)安装 Chromium 及系统依赖，安装系统包时可能需要 sudo。
 
-部署只有 Node 服务和 Chromium，无需桌面环境、Electron、Xvfb、noVNC、Docker、数据库或前端构建。关闭网页不停止服务；终端按 `Ctrl+C` 会停止任务和实例。需要脱离终端运行时：
+部署使用 Node.js、Chromium、Xvfb、x11vnc 和 [noVNC](https://github.com/novnc/noVNC)。`setup.sh` 会安装全部依赖，无需完整桌面环境、Docker、数据库或前端构建。每个实例有独立虚拟屏幕，远程画面和控制共用管理端口 `8787`，无需开放 VNC 端口。关闭网页不停止服务；终端按 `Ctrl+C` 会停止任务和实例。需要脱离终端运行时：
 
 ```bash
 mkdir -p data
@@ -29,7 +29,7 @@ echo $! >data/server.pid
 # 停止：kill "$(cat data/server.pid)"
 ```
 
-所有实例强制使用无头模式，兼容导入的 `headless` 字段不改变服务器运行模式。每个 Profile 使用自己的 `data/userdata/<id>/`；`viewport` 控制页面渲染及截图大小。网页提供预览截图，网站交互通过任务或 MCP 完成。备份 `data/`、`tasks/` 和 `.env` 即可保留配置、登录状态和任务；Electron User Data 不自动迁移。
+Ubuntu 默认在虚拟屏幕中运行浏览器。每个 Profile 使用自己的 `data/userdata/<id>/`；`viewport` 控制页面渲染大小，远程画面默认按操作页窗口缩放。只需无头自动化时可设置 `BPS_REMOTE_DESKTOP=0`，此时远程操作不可用；兼容导入的 `headless` 字段不覆盖此服务配置。备份 `data/`、`tasks/` 和 `.env` 即可保留配置、登录状态和任务；Electron User Data 不自动迁移。
 
 `bash start.sh` 加载 `.env`。开发时直接 `npm start` 使用当前进程环境变量，默认仅监听 `127.0.0.1:8787`。
 
@@ -106,7 +106,7 @@ ssh -N -L 8787:127.0.0.1:8787 -o ExitOnForwardFailure=yes -o ServerAliveInterval
 ## 使用
 
 1. **创建 Profile**：填写名称、任意网站 URL、默认任务、提示词和代理。每个 Profile 都有自己的 User Data 目录。
-2. **后台打开**：点击卡片上的「打开」，通过任务或 MCP 操作网站。Cookie、LocalStorage、IndexedDB、HTTP 缓存、CacheStorage 等保存在该 Profile 内。
+2. **打开并操作**：点击卡片「打开」，再点击预览进入远程操作页，可搜索、登录、点击、输入和滚动。Cookie、LocalStorage、IndexedDB、HTTP 缓存、CacheStorage 等保存在该 Profile 内。
 3. **独立运行**：勾选多个 Profile，在运行页设置并发数。默认使用各 Profile 自己的任务、网址和提示词；可为本批次指定覆盖值。
 4. **查看结果**：运行页显示排队、当前步骤、成功、失败和取消状态。「详情 / 产物」可查看结果 JSON、下载截图与文件。日志可按 Profile 和级别过滤。
 5. **管理任务**：从「任务」页新建、导入、编辑 JSON；JS 插件放入 `tasks/` 后点击「重新加载」。
@@ -116,6 +116,37 @@ ssh -N -L 8787:127.0.0.1:8787 -o ExitOnForwardFailure=yes -o ServerAliveInterval
 并发数量限制整个进程内正在执行的任务，多个批次共享上限。排队中的 Profile 也被预留，重复提交返回明确错误。任务结束默认关闭浏览器；选择「结束后保持打开」后，点击实例「关闭」释放资源。
 
 「复制 Profile」只复制配置，生成新的空白 User Data，不复制登录状态。修改正在打开的 Profile 配置，需要先关闭该浏览器。
+
+### 网页远程操作
+
+- 点击实例预览进入 `/control.html?profile=实例ID`。鼠标、键盘和滚轮直接操作服务器上的浏览器；勾选「适应窗口」自动缩放，也可全屏。
+- 输入中文或粘贴文字时，先点击远程网页里的输入框，再展开「中文输入 / 粘贴文字」，填写文字并点击「输入到网页」。成功发送后输入框会清空。
+- 操作页上方可输入网址、后退、前进和刷新。远程浏览器中的标签页及登录弹窗仍属于原来的隔离实例。
+- 每个实例同一时间只有一个远程操作连接。连接期间拒绝任务和 MCP 抢占；先点「断开操作」或关闭操作页，再执行自动化。连接断开后实例继续运行，登录状态保留。
+- 工作台点击「停止」会断开远程操作并关闭对应实例。缺少依赖时会明确报错，请在服务器运行 `bash setup.sh`。
+- 远程操作功能需要 Ubuntu/Linux。Windows 开发环境仍可运行无头自动化和工作台。
+
+### 已部署旧版：升级为可操作版本
+
+在服务器执行以下命令，保留现有 `.env` 和 `data/`。先按原启动方式停止服务；使用本 README 的后台启动方式时，执行：
+
+```bash
+cd /opt/brower-play-set
+kill "$(cat data/server.pid)"
+```
+
+确认旧进程已经退出后更新并重启：
+
+```bash
+git pull --ff-only origin ubt
+bash setup.sh
+nohup bash start.sh >data/server.log 2>&1 &
+echo $! >data/server.pid
+sleep 2
+cat data/server.log
+```
+
+保持原来的 SSH `-L 8787:127.0.0.1:8787` 转发，刷新工作台，启动实例并点击预览即可操作。若 `.env` 中显式设置过 `BPS_REMOTE_DESKTOP=0`，将其改为 `1` 后再启动。
 
 ### 代理
 
@@ -194,7 +225,9 @@ ssh -N -L 8787:127.0.0.1:8787 -o ExitOnForwardFailure=yes -o ServerAliveInterval
 ```text
 src/
   store.js             Profile / 设置校验、原子写入、配置文件锁
-  browser.js           无头 Chromium、持久化上下文、跨进程 User Data 锁
+  browser.js           Chromium、持久化上下文、跨进程 User Data 锁
+  virtual-display.js   每个实例的独立 Xvfb 屏幕与生命周期
+  remote-control.js    noVNC WebSocket、独占操作权及中文输入
   server-access.js     HTTP Basic 登录、Host / Origin 检查
   downloads.js         手动与自动下载统一保存
   activity.js          Profile 占用管理
@@ -229,7 +262,7 @@ node src/cli.js mcp-config --profile PROFILE_ID
 node src/cli.js remove PROFILE_ID --purge
 ```
 
-`run` 中未提供的任务、网址和提示词沿用各 Profile 配置。所有实例均无头运行；`--keep-open` 保持实例运行，`--fresh` 关闭已有实例再启动。失败或取消的批次返回非零退出码。CLI 加载部署配置时使用 `node --env-file=.env src/cli.js ...`。
+`run` 中未提供的任务、网址和提示词沿用各 Profile 配置。实例显示模式由 `BPS_REMOTE_DESKTOP` 决定；`--keep-open` 保持实例运行，`--fresh` 关闭已有实例再启动。失败或取消的批次返回非零退出码。CLI 加载部署配置时使用 `node --env-file=.env src/cli.js ...`。
 
 | 环境变量 | 默认值 | 用途 |
 | --- | --- | --- |
@@ -240,8 +273,9 @@ node src/cli.js remove PROFILE_ID --purge
 | `BPS_ADMIN_USER` | 未设置 | 管理员用户名，对外监听时必填 |
 | `BPS_ADMIN_PASSWORD` | 未设置 | 管理员密码，对外监听时必填 |
 | `BPS_PUBLIC_URL` | 未设置 | 可选的外部根地址，如 `https://bps.example.com` |
+| `BPS_REMOTE_DESKTOP` | Linux 开启，其他平台关闭 | `1` 开启独立虚拟屏幕及网页操作；`0` 仅无头自动化 |
 
-登录覆盖管理页、API、预览、事件流、下载与 MCP。使用 HTTPS 反向代理时设置 `BPS_PUBLIC_URL`，代理保留原始 Host，并关闭 SSE 响应缓冲。网站访问由各 Profile 的 URL 和代理配置决定。
+登录覆盖管理页、API、预览、远程操作 WebSocket、事件流、下载与 MCP。使用 HTTPS 反向代理时设置 `BPS_PUBLIC_URL`，代理保留原始 Host、支持 WebSocket Upgrade，并关闭 SSE 响应缓冲。网站访问由各 Profile 的 URL 和代理配置决定。
 
 ## 验证
 
@@ -255,6 +289,6 @@ npm run smoke             # 浏览器核心集成检查
 
 集成测试使用本机测试网页和临时 User Data，不需要第三方账号。覆盖存储与缓存隔离、重启持久化、代理认证、跨进程锁、全局并发、取消、文件上传下载、MCP 与 GUI。GUI 检查截图保存在 `test-results/`。
 
-CI 在 Ubuntu 和 Windows 上直接运行无头集成测试，Ubuntu 不需要显示服务。
+CI 在 Ubuntu 和 Windows 上运行自动化集成测试。Ubuntu 额外验证真实 noVNC 鼠标键盘、中文输入、缩放、滚动、会话隔离及资源释放，测试自动创建和关闭独立虚拟屏幕。
 
 依赖：[Playwright](https://github.com/microsoft/playwright)、[Playwright MCP](https://github.com/microsoft/playwright-mcp)、[MCP SDK](https://github.com/modelcontextprotocol/typescript-sdk)、Express、basic-auth、p-queue、Zod、proper-lockfile、write-file-atomic。依赖许可证保留在各包中；项目许可证见 [LICENSE](LICENSE)。

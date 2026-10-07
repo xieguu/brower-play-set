@@ -33,6 +33,7 @@
   ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.0",
+    "@novnc/novnc": "1.7.0",
     "@playwright/mcp": "0.0.83",
     "basic-auth": "3.0.0",
     "express": "^4.19.2",
@@ -41,6 +42,7 @@
     "playwright": "1.64.0-alpha-1790635538000",
     "proper-lockfile": "4.1.2",
     "write-file-atomic": "6.0.0",
+    "ws": "8.22.0",
     "zod": "^4.6.5"
   }
 }
