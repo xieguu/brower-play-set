@@ -39,7 +39,7 @@
     </div>
   </header>
   <aside class="sidebar">
-    <div class="workspace-label">WORKSPACE <span>本地</span></div>
+    <div class="workspace-label">WORKSPACE <span>服务器</span></div>
     <nav class="tabs" role="tablist" aria-label="主导航" aria-orientation="vertical">
       <button class="tab is-active" role="tab" data-view="profiles" aria-selected="true"><i data-lucide="panels-top-left"></i><span>实例管理</span><span class="nav-count" id="navProfileCount">0</span></button>
       <button class="tab" role="tab" data-view="run" aria-selected="false"><i data-lucide="workflow"></i><span>运行控制台</span></button>
@@ -49,7 +49,7 @@
       <button class="tab" role="tab" data-view="logs" aria-selected="false"><i data-lucide="scroll-text"></i><span>日志中心</span></button>
       <button class="tab" role="tab" data-view="settings" aria-selected="false"><i data-lucide="sliders-horizontal"></i><span>环境设置</span></button>
     </nav>
-    <div class="sidebar-bottom"><div class="local-mark"><i data-lucide="hard-drive"></i><div><strong>本地工作空间</strong><span>独立会话 · 持久保存</span></div><span class="dot green"></span></div><p>让每一个浏览器，各司其职。</p></div>
+    <div class="sidebar-bottom"><div class="local-mark"><i data-lucide="hard-drive"></i><div><strong>服务器工作空间</strong><span>独立会话 · 持久保存</span></div><span class="dot green"></span></div><p>让每一个浏览器，各司其职。</p></div>
   </aside>
   <main class="app">
     <!-- ============ Profile 视图 ============ -->
@@ -78,7 +78,7 @@
         <section class="rail-card"><div class="rail-head"><h2>任务动态</h2><button class="text-link" data-go="run">查看全部<i data-lucide="arrow-up-right"></i></button></div><div id="dashboardQueue" class="queue-list"></div></section>
         <section class="rail-card quick-card"><div class="rail-head"><h2>快捷操作</h2></div><div class="quick-grid"><button id="quickAddBtn"><i data-lucide="square-plus"></i>新建实例</button><button id="quickTaskBtn"><i data-lucide="file-plus-2"></i>新建任务</button><button id="importProfilesBtn"><i data-lucide="upload"></i>导入配置</button><button id="exportProfilesBtn"><i data-lucide="download"></i>导出配置</button></div><input id="importProfilesFile" type="file" accept=".json,application/json" hidden /></section>
       </aside></div>
-      <footer class="workspace-footer"><span><span class="dot green"></span>数据保存在本机</span><span>Playwright + MCP<span class="footer-divider">/</span>Browser Play Set</span></footer>
+      <footer class="workspace-footer"><span><span class="dot green"></span>数据保存在服务器</span><span>Playwright + MCP<span class="footer-divider">/</span>Browser Play Set</span></footer>
     </section>
 
     <!-- ============ 运行视图 ============ -->
