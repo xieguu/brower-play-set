@@ -54,10 +54,10 @@ test('Ubuntu remote browser: real noVNC input, scaling, Chinese, isolation and c
     async function remoteClick(selector) {
       const element = await target.locator(selector).boundingBox();
       const origin = await target.evaluate(() => ({ x: screenX + (outerWidth - innerWidth) / 2,
-        y: screenY + outerHeight - innerHeight, w: screen.width, h: screen.height }));
+        y: screenY + outerHeight - innerHeight }));
       const frame = await canvas.boundingBox();
-      await page.mouse.click(frame.x + (origin.x + element.x + element.width / 2) * frame.width / origin.w,
-        frame.y + (origin.y + element.y + element.height / 2) * frame.height / origin.h);
+      await page.mouse.click(frame.x + (origin.x + element.x + element.width / 2) * frame.width / sa.display.width,
+        frame.y + (origin.y + element.y + element.height / 2) * frame.height / sa.display.height);
     }
     await remoteClick('#prompt');
     await page.keyboard.type('remote-keyboard');
